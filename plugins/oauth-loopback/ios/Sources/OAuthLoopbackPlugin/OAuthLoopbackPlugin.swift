@@ -167,7 +167,7 @@ private final class LoopbackSession {
             }
             let target = String(parts[1])
             let url = URL(string: "http://127.0.0.1\(target)")
-            let payload = Self.parseQuery(url: url)
+            let payload = Self.parseQuery(url: url, expectedPath: self.path)
             self.receivedPayload = payload
             self.pendingCallback?(payload)
             self.pendingCallback = nil
@@ -180,9 +180,9 @@ private final class LoopbackSession {
         }
     }
 
-    private static func parseQuery(url: URL?) -> [String: Any] {
+    private static func parseQuery(url: URL?, expectedPath: String) -> [String: Any] {
         guard let url = url else { return [:] }
-        guard url.path == url.path else { return [:] }
+        guard url.path == expectedPath else { return [:] }
         var result: [String: Any] = [:]
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         for item in items {
