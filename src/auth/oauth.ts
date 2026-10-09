@@ -18,6 +18,8 @@ import type {
   TokenResponse,
 } from './types';
 import { getOrCreateExtAgentHostId } from './host-id';
+import { verifyIdToken } from './id-token';
+import { decodeJwtPart } from './jwt-encoding';
 import { saveCredentials, setActiveClientId } from './token-store';
 
 export function buildAuthorizeUrl(
@@ -188,23 +190,23 @@ export async function exchangeAuthorizationCode(
   return (await res.json()) as TokenResponse;
 }
 
-export function credentialFromTokenResponse(
+export async function credentialFromTokenResponse(
   token: TokenResponse,
   meta: {
     clientId: string;
     extAgentHostId: string;
     nonce: string;
   },
-): OAuthCredentialRecord {
+): Promise<OAuthCredentialRecord> {
   const scopes = (token.scope ?? '').split(/\s+/).filter(Boolean);
   if (!scopes.includes('chatgpt.tokens.use.direct')) {
     throw new Error('ChatGPT plan usage scope was not granted');
   }
 
-  const payload = parseJwtPayload(token.id_token);
-  if (meta.nonce && payload.nonce && payload.nonce !== meta.nonce) {
-    throw new Error('ID token nonce mismatch');
-  }
+  const payload = await verifyIdToken(token.id_token, {
+    clientId: meta.clientId,
+    nonce: meta.nonce || undefined,
+  });
 
   const now = Date.now();
   return {
@@ -228,8 +230,7 @@ export function parseJwtPayload(idToken: string): Record<string, unknown> {
   if (parts.length < 2) {
     throw new Error('Invalid id_token');
   }
-  const json = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
-  return JSON.parse(json) as Record<string, unknown>;
+  return decodeJwtPart<Record<string, unknown>>(parts[1]);
 }
 
 export async function refreshAccessToken(
@@ -253,7 +254,7 @@ export async function refreshAccessToken(
   }
 
   const token = (await res.json()) as TokenResponse;
-  const updated = credentialFromTokenResponse(token, {
+  const updated = await credentialFromTokenResponse(token, {
     clientId: record.clientId,
     extAgentHostId: record.extAgentHostId,
     nonce: '',
@@ -271,7 +272,7 @@ export async function completeSignIn(savedClientId?: string | null): Promise<OAu
   const callback = await runAuthorizationInBrowser(attempt, authorizeUrl);
   const { code, issuedClientId } = validateCallback(attempt, callback);
   const token = await exchangeAuthorizationCode(attempt, code, issuedClientId);
-  const record = credentialFromTokenResponse(token, {
+  const record = await credentialFromTokenResponse(token, {
     clientId: issuedClientId,
     extAgentHostId: attempt.extAgentHostId,
     nonce: attempt.nonce,
