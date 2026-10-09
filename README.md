@@ -1,25 +1,65 @@
 # capgo-browser
 
-Mobile AI browser: sign in with ChatGPT, then an AI browses and acts for you. Built on capacitor-inappbrowser and capacitor-native-navigation.
+Mobile AI browser for iOS and Android (Capacitor 8). Sign in with ChatGPT, chat with an agent, and let it drive a native in-app browser on your behalf.
 
-## Purpose
+## Features (scaffold)
 
-A mobile browser app where the user signs in with their ChatGPT account and then asks, by voice or chat, for an AI to browse and act on their behalf. The AI sees the page, decides what to do, and drives the browser. The system password manager and autofill keep working like in a real browser.
+- **Connect ChatGPT** first screen with Continue with ChatGPT (OAuth 2 + PKCE, plan-usage scopes).
+- **Secure tokens** in iOS Keychain / Android Keystore via `capacitor-secure-storage-plugin` (never `localStorage`).
+- **Chat UI** (text first; voice planned with on-device STT/TTS).
+- **Agent loop** against the OpenAI Responses API (`store: false`, `stream: true`) using only the ChatGPT plan token.
+- **Browser tools** mapped to `@capgo/capacitor-inappbrowser` (navigate, screenshot, click, type, scroll, read DOM, extract).
+- **Native chrome** via `@capgo/native-navigation` (navbar, tab bar, safe areas).
 
-## Planned architecture
+## Docs
 
-- **App shell:** Capacitor 8 app (iOS and Android).
-- **Auth:** Sign in with ChatGPT using OAuth with PKCE. The app is the only client, and ChatGPT is the only model provider.
-- **Agent loop:** Responses API with function tools. The model calls tools that map to capacitor-inappbrowser methods (open URL, read page, click, type, scroll, screenshot, navigate back and forward, execute script).
-- **Browser:** [capacitor-inappbrowser](https://github.com/Cap-go/capacitor-inappbrowser) for the web view, extended or wrapped by a custom plugin where needed.
-- **Chrome and navigation:** [capacitor-native-navigation](https://github.com/Cap-go/capacitor-native-navigation) for native toolbars, tabs and transitions.
-- **Token storage:** iOS Keychain and Android Keystore. Tokens never touch web storage or logs.
-- **Input:** chat and voice.
+- [OAuth loopback spike](docs/oauth-spike.md) (mobile redirect risks and fallbacks)
+- [Autofill notes](docs/autofill.md) (password managers in the webview)
 
-## Main risk
+## Requirements
 
-OAuth loopback redirect on mobile. Sign in with ChatGPT flows are built around a loopback redirect (localhost callback), which is not directly available inside a mobile app. We need to validate options such as a custom URL scheme or universal link redirect, a small local listener inside the app, or a relay, and confirm what the provider accepts.
+- [Bun](https://bun.sh) for scripts and tests
+- Xcode / Android Studio for native shells
 
-## Status
+## Setup
 
-Planning. Nothing is implemented yet.
+```bash
+bun install
+bun run build
+bunx cap sync
+```
+
+Open native projects:
+
+```bash
+bunx cap open ios
+bunx cap open android
+```
+
+## Scripts
+
+| Command | Description |
+| --- | --- |
+| `bun run dev` | Vite dev server (web shell only) |
+| `bun run build` | Production web bundle into `dist/` |
+| `bun run typecheck` | TypeScript |
+| `bun run lint` | ESLint |
+| `bun test` | Unit tests (PKCE, OAuth parsing, agent helpers) |
+| `bun run cap:sync` | Copy web assets and update native projects |
+
+## Architecture
+
+```
+src/auth/*        Sign in with ChatGPT (PKCE, token refresh, secure storage)
+src/agent/*       Responses API streaming + browser tool dispatch
+src/browser/*     Thin wrapper over capacitor-inappbrowser
+plugins/oauth-loopback   Loopback redirect listener for OAuth on mobile
+```
+
+## Agent constraints
+
+This route does **not** support hosted MCP, native computer use, or image generation tools. The model may only call the browser function tools defined in `src/agent/tools.ts`.
+
+## License
+
+Private Capgo repository. See LICENSE if present.

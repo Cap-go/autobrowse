@@ -1,0 +1,33 @@
+{
+  "name": "@capgo/oauth-loopback",
+  "version": "0.1.0",
+  "description": "Loopback OAuth callback listener for Sign in with ChatGPT on mobile",
+  "main": "dist/plugin.cjs.js",
+  "module": "dist/esm/index.js",
+  "types": "dist/esm/index.d.ts",
+  "type": "module",
+  "files": [
+    "dist/",
+    "android/src/main/",
+    "ios/Sources/",
+    "CapgoOAuthLoopback.podspec"
+  ],
+  "peerDependencies": {
+    "@capacitor/core": "^8.0.0"
+  },
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    },
+    "android": {
+      "src": "android"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@capacitor/core": "^8.5.3",
+    "typescript": "^5.9.3"
+  }
+}

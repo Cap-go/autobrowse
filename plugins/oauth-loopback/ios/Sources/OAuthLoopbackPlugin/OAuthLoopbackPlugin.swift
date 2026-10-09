@@ -1,0 +1,201 @@
+import Foundation
+import Capacitor
+import Network
+
+@objc(OAuthLoopbackPlugin)
+public class OAuthLoopbackPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "OAuthLoopbackPlugin"
+    public let jsName = "OAuthLoopback"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "waitForCallback", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
+    ]
+
+    private var sessions: [String: LoopbackSession] = [:]
+
+    @objc func start(_ call: CAPPluginCall) {
+        let path = call.getString("path") ?? "/auth/callback"
+        let normalizedPath = path.hasPrefix("/") ? path : "/\(path)"
+        let requestedPort = call.getInt("port")
+        let port = UInt16(requestedPort ?? Int(findFreePort()))
+        let sessionId = UUID().uuidString
+        let redirectUri = "http://127.0.0.1:\(port)\(normalizedPath)"
+
+        let session = LoopbackSession(id: sessionId, port: port, path: normalizedPath)
+        session.start { result in
+            switch result {
+            case .success:
+                self.sessions[sessionId] = session
+                call.resolve([
+                    "sessionId": sessionId,
+                    "redirectUri": redirectUri,
+                    "port": Int(port),
+                ])
+            case .failure(let error):
+                call.reject("Failed to start loopback server: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    @objc func waitForCallback(_ call: CAPPluginCall) {
+        guard let sessionId = call.getString("sessionId") else {
+            call.reject("sessionId is required")
+            return
+        }
+        guard let session = sessions[sessionId] else {
+            call.reject("Unknown session")
+            return
+        }
+        let timeoutMs = call.getDouble("timeoutMs") ?? 300_000
+        session.wait(timeoutMs: timeoutMs / 1000.0) { payload in
+            if let payload = payload {
+                call.resolve(payload)
+            } else {
+                call.reject("OAuth loopback timed out")
+            }
+        }
+    }
+
+    @objc func stop(_ call: CAPPluginCall) {
+        guard let sessionId = call.getString("sessionId") else {
+            call.reject("sessionId is required")
+            return
+        }
+        if let session = sessions.removeValue(forKey: sessionId) {
+            session.stop()
+        }
+        call.resolve()
+    }
+
+    private func findFreePort() -> UInt16 {
+        var port: UInt16 = 1455
+        for _ in 0..<32 {
+            if isPortFree(port) {
+                return port
+            }
+            port += 1
+        }
+        return 1455
+    }
+
+    private func isPortFree(_ port: UInt16) -> Bool {
+        let socketFD = socket(AF_INET, SOCK_STREAM, 0)
+        if socketFD < 0 { return false }
+        defer { close(socketFD) }
+        var addr = sockaddr_in()
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = port.bigEndian
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1")
+        let bindResult = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(socketFD, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
+            }
+        }
+        return bindResult == 0
+    }
+}
+
+private final class LoopbackSession {
+    private let id: String
+    private let port: UInt16
+    private let path: String
+    private var listener: NWListener?
+    private var pendingCallback: (([String: Any]?) -> Void)?
+    private var receivedPayload: [String: Any]?
+
+    init(id: String, port: UInt16, path: String) {
+        self.id = id
+        self.port = port
+        self.path = path
+    }
+
+    func start(completion: @escaping (Result<Void, Error>) -> Void) {
+        do {
+            let params = NWParameters.tcp
+            params.requiredInterfaceType = .loopback
+            let listener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
+            self.listener = listener
+            listener.newConnectionHandler = { [weak self] connection in
+                self?.handle(connection: connection)
+            }
+            listener.stateUpdateHandler = { state in
+                if case .ready = state {
+                    completion(.success(()))
+                } else if case .failed(let error) = state {
+                    completion(.failure(error))
+                }
+            }
+            listener.start(queue: .global())
+        } catch {
+            completion(.failure(error))
+        }
+    }
+
+    func wait(timeoutMs: Double, completion: @escaping ([String: Any]?) -> Void) {
+        if let payload = receivedPayload {
+            completion(payload)
+            return
+        }
+        pendingCallback = completion
+        DispatchQueue.global().asyncAfter(deadline: .now() + timeoutMs) { [weak self] in
+            guard let self = self else { return }
+            if self.receivedPayload == nil {
+                self.pendingCallback?(nil)
+                self.pendingCallback = nil
+            }
+        }
+    }
+
+    func stop() {
+        listener?.cancel()
+        listener = nil
+    }
+
+    private func handle(connection: NWConnection) {
+        connection.start(queue: .global())
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, _, _ in
+            guard let self = self, let data = data, let request = String(data: data, encoding: .utf8) else {
+                connection.cancel()
+                return
+            }
+            let firstLine = request.split(separator: "\n", maxSplits: 1).first ?? ""
+            let parts = firstLine.split(separator: " ")
+            guard parts.count >= 2 else {
+                connection.cancel()
+                return
+            }
+            let target = String(parts[1])
+            let url = URL(string: "http://127.0.0.1\(target)")
+            let payload = Self.parseQuery(url: url)
+            self.receivedPayload = payload
+            self.pendingCallback?(payload)
+            self.pendingCallback = nil
+
+            let body = "<html><body><p>Sign in complete. Return to Capgo Browser.</p></body></html>"
+            let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
+            connection.send(content: response.data(using: .utf8), completion: .contentProcessed { _ in
+                connection.cancel()
+            })
+        }
+    }
+
+    private static func parseQuery(url: URL?) -> [String: Any] {
+        guard let url = url else { return [:] }
+        guard url.path == url.path else { return [:] }
+        var result: [String: Any] = [:]
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        for item in items {
+            guard let value = item.value else { continue }
+            switch item.name {
+            case "code": result["code"] = value
+            case "state": result["state"] = value
+            case "client_id": result["clientId"] = value
+            case "error": result["error"] = value
+            case "error_description": result["errorDescription"] = value
+            default: break
+            }
+        }
+        return result
+    }
+}
