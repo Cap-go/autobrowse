@@ -6,4 +6,9 @@ if (!root) {
 }
 
 const app = new App(root);
-void app.init();
+const demo = import.meta.env.DEV ? new URLSearchParams(location.search).get('demo') : null;
+if (demo) {
+  void import('./ui/demo').then(({ runDemo }) => runDemo(app, demo));
+} else {
+  void app.init();
+}

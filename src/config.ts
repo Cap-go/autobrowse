@@ -30,3 +30,15 @@ export const SECURE_STORAGE_KEYS = {
   hostId: 'capgo_browser_ext_agent_host_id',
   credentialsPrefix: 'capgo_browser_oauth_',
 } as const;
+
+export const APP_LINKS = {
+  privacy: 'https://capgo.app/browser/privacy/',
+  terms: 'https://capgo.app/browser/terms/',
+  support: 'https://capgo.app/browser/support/',
+  openaiUsage: 'https://openai.com/policies/usage-policies/',
+} as const;
+
+/** Non-secret UI preferences (localStorage is fine here; never store tokens). */
+export const PREF_KEYS = {
+  onboarded: 'capgo_browser_onboarded_v1',
+} as const;

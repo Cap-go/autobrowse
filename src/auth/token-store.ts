@@ -33,3 +33,13 @@ export async function setActiveClientId(clientId: string): Promise<void> {
 export async function clearCredentials(clientId: string): Promise<void> {
   await secureRemove(storageKeyForClient(clientId));
 }
+
+/** Remove every stored credential for the active account (sign out). */
+export async function signOut(): Promise<void> {
+  const activeKey = `${SECURE_STORAGE_KEYS.credentialsPrefix}active`;
+  const activeClientId = await secureGet(activeKey);
+  if (activeClientId) {
+    await clearCredentials(activeClientId);
+  }
+  await secureRemove(activeKey);
+}

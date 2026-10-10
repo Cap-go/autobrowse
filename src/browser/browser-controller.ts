@@ -10,8 +10,37 @@ export interface BrowserSnapshot {
 
 let activeWebViewId: string | undefined;
 let lastKnownUrl = 'https://example.com';
+let listenersReady: Promise<void> | undefined;
+
+function requireBrowser(): string {
+  if (!activeWebViewId) throw new Error('Browser is not open. Navigate to a page first.');
+  return activeWebViewId;
+}
+
+export function isBrowserOpen(): boolean {
+  return activeWebViewId !== undefined;
+}
+
+export async function closeBrowser(): Promise<void> {
+  if (!activeWebViewId) return;
+  const id = activeWebViewId;
+  await InAppBrowser.close({ id });
+  if (activeWebViewId === id) activeWebViewId = undefined;
+}
+
+async function registerBrowserListeners(): Promise<void> {
+  await InAppBrowser.addListener('urlChangeEvent', (event) => {
+    if (activeWebViewId && (!event.id || event.id === activeWebViewId)) {
+      lastKnownUrl = event.url;
+    }
+  });
+  await InAppBrowser.addListener('closeEvent', (event) => {
+    if (!event.id || event.id === activeWebViewId) activeWebViewId = undefined;
+  });
+}
 
 async function runScriptReturning<T>(script: string): Promise<T> {
+  const id = requireBrowser();
   const requestId = crypto.randomUUID();
   const channel = `capgo-dom-${requestId}`;
 
@@ -54,11 +83,13 @@ async function runScriptReturning<T>(script: string): Promise<T> {
     })();
   `;
 
-  await InAppBrowser.executeScript({ id: activeWebViewId, code: wrapped });
+  await InAppBrowser.executeScript({ id, code: wrapped });
   return listenerPromise;
 }
 
 export async function openBrowser(url: string): Promise<void> {
+  listenersReady ??= registerBrowserListeners();
+  await listenersReady;
   const result = await InAppBrowser.openWebView({
     url,
     toolbarType: ToolBarType.NAVIGATION,
@@ -69,31 +100,26 @@ export async function openBrowser(url: string): Promise<void> {
   });
   activeWebViewId = result.id;
   lastKnownUrl = url;
-
-  void InAppBrowser.addListener('urlChangeEvent', (event) => {
-    if (!activeWebViewId || event.id === activeWebViewId) {
-      lastKnownUrl = event.url;
-    }
-  });
 }
 
 export async function navigate(url: string): Promise<void> {
-  await InAppBrowser.setUrl({ url, id: activeWebViewId });
+  if (!isBrowserOpen()) return openBrowser(url);
+  await InAppBrowser.setUrl({ url, id: requireBrowser() });
   lastKnownUrl = url;
 }
 
 export async function goBack(): Promise<void> {
-  await InAppBrowser.goBack({ id: activeWebViewId });
+  await InAppBrowser.goBack({ id: requireBrowser() });
 }
 
 export async function takeScreenshot(): Promise<string> {
-  const shot = await InAppBrowser.takeScreenshot({ id: activeWebViewId });
+  const shot = await InAppBrowser.takeScreenshot({ id: requireBrowser() });
   return shot.base64;
 }
 
 export async function clickAt(x: number, y: number): Promise<void> {
   await InAppBrowser.dispatchInputEvent({
-    id: activeWebViewId,
+    id: requireBrowser(),
     type: 'click',
     x,
     y,
@@ -102,7 +128,7 @@ export async function clickAt(x: number, y: number): Promise<void> {
 
 export async function scrollBy(dx: number, dy: number): Promise<void> {
   await InAppBrowser.dispatchInputEvent({
-    id: activeWebViewId,
+    id: requireBrowser(),
     type: 'scroll',
     x: 200,
     y: 400,
@@ -115,7 +141,7 @@ export async function typeText(text: string, x: number, y: number): Promise<void
   await clickAt(x, y);
   const escaped = JSON.stringify(text);
   await InAppBrowser.executeScript({
-    id: activeWebViewId,
+    id: requireBrowser(),
     code: `
       (() => {
         const active = document.activeElement;

@@ -63,3 +63,25 @@ This route does **not** support hosted MCP, native computer use, or image genera
 ## License
 
 Private Capgo repository. See LICENSE if present.
+
+## App Store
+
+Everything needed for App Store Connect lives in `store/`:
+
+- `store/metadata.md`: name, subtitle, description, keywords, age rating, privacy label, review notes
+- `store/legal/`: privacy policy, terms, support page (publish at `capgo.app/browser/*`)
+- `store/icon/`: 1024 icon source (`icon.svg`) and PNG
+- `store/screenshots/`: 6.9" and 6.5" iPhone screenshots
+
+Regenerate screenshots (needs `bun run dev` on port 5179):
+
+```bash
+bunx vite --port 5179 &
+cd store/tools && bun install && bun shoot-raw.mjs && bun frame.mjs
+```
+
+Regenerate native icons and splash from `assets/`:
+
+```bash
+bunx @capacitor/assets generate --ios --android --iconBackgroundColor '#14c7c0' --splashBackgroundColor '#0b0d12'
+```

@@ -2,10 +2,10 @@
 import PackageDescription
 
 let package = Package(
-    name: "CapgoOAuthLoopback",
+    name: "CapgoOauthLoopback",
     platforms: [.iOS(.v15)],
     products: [
-        .library(name: "CapgoOAuthLoopback", targets: ["OAuthLoopbackPlugin"])
+        .library(name: "CapgoOauthLoopback", targets: ["OAuthLoopbackPlugin"])
     ],
     dependencies: [
         .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "8.0.0")

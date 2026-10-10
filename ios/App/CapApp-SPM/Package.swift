@@ -15,7 +15,8 @@ let package = Package(
         .package(name: "CapacitorApp", path: "../../../node_modules/@capacitor/app"),
         .package(name: "CapgoCapacitorInappbrowser", path: "../../../node_modules/@capgo/capacitor-inappbrowser"),
         .package(name: "CapgoNativeNavigation", path: "../../../node_modules/@capgo/native-navigation"),
-        .package(name: "CapacitorSecureStoragePlugin", path: "../../../node_modules/capacitor-secure-storage-plugin")
+        .package(name: "CapacitorSecureStoragePlugin", path: "../../../node_modules/capacitor-secure-storage-plugin"),
+        .package(name: "CapgoOauthLoopback", path: "../../../node_modules/@capgo/oauth-loopback")
     ],
     targets: [
         .target(
@@ -26,7 +27,8 @@ let package = Package(
                 .product(name: "CapacitorApp", package: "CapacitorApp"),
                 .product(name: "CapgoCapacitorInappbrowser", package: "CapgoCapacitorInappbrowser"),
                 .product(name: "CapgoNativeNavigation", package: "CapgoNativeNavigation"),
-                .product(name: "CapacitorSecureStoragePlugin", package: "CapacitorSecureStoragePlugin")
+                .product(name: "CapacitorSecureStoragePlugin", package: "CapacitorSecureStoragePlugin"),
+                .product(name: "CapgoOauthLoopback", package: "CapgoOauthLoopback")
             ]
         )
     ]

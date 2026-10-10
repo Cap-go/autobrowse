@@ -1,10 +1,10 @@
 import * as browser from '../browser/browser-controller';
-import type { BrowserToolName } from './types';
+import type { BrowserToolName, ToolOutput } from './types';
 
 export async function runBrowserTool(
   name: BrowserToolName,
   args: Record<string, unknown>,
-): Promise<string> {
+): Promise<ToolOutput> {
   switch (name) {
     case 'browser_navigate': {
       const url = String(args.url ?? '');
@@ -16,7 +16,14 @@ export async function runBrowserTool(
     }
     case 'browser_screenshot': {
       const base64 = await browser.takeScreenshot();
-      return JSON.stringify({ ok: true, base64Preview: base64.slice(0, 120) });
+      return [
+        { type: 'input_text', text: JSON.stringify({ ok: true }) },
+        {
+          type: 'input_image',
+          image_url: base64.startsWith('data:') ? base64 : `data:image/png;base64,${base64}`,
+          detail: 'auto',
+        },
+      ];
     }
     case 'browser_click': {
       await browser.clickAt(Number(args.x), Number(args.y));

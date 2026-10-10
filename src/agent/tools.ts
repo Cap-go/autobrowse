@@ -24,7 +24,7 @@ export const BROWSER_TOOLS: FunctionToolDefinition[] = [
   {
     type: 'function',
     name: 'browser_screenshot',
-    description: 'Capture a JPEG screenshot of the current page.',
+    description: 'Capture a PNG screenshot of the current page.',
     parameters: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
