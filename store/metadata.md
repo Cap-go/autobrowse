@@ -117,9 +117,8 @@ Rationale: prompts and page content are transmitted off device to OpenAI (Respon
 
 | Field | Value |
 | --- | --- |
-| Contact | Martin Donadieu, tori@capgo.app, phone: (fill in) |
-| Sign-in required | Yes for the agent; the browser works without sign in |
-| Demo account | ChatGPT account (see below) |
+| Contact | Same contact as the team's other apps in App Store Connect |
+| Sign-in required | No (browser works without sign in; agent uses reviewer's ChatGPT) |
 
 ### Notes for the reviewer
 
@@ -136,10 +135,10 @@ Capgo Browser is a WebKit browser with an optional AI agent.
    agent opens the page in the browser and replies in the chat. Each step is
    shown as a chip ("Opening...", "Reading the page").
 
-Demo ChatGPT account:
-  Email:    <create a dedicated reviewer ChatGPT account>
-  Password: <password>
-  (No 2FA on this account.)
+The AI agent uses the reviewer's own ChatGPT account through OpenAI's
+official Sign in with ChatGPT (a free ChatGPT account works). If you need a
+dedicated test account, contact tori@capgo.app and we will provide one
+within 24h.
 
 - Sign out and data clearing: Settings (gear icon) > Sign out /
   "Close browser and clear session". No account is created by this app, so
