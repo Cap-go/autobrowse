@@ -21,12 +21,6 @@ export const OAUTH_SCOPES = [
 /** Default loopback path. Port may change per attempt; path must stay fixed. */
 export const OAUTH_CALLBACK_PATH = '/auth/callback';
 
-/**
- * The loopback server 302s here after capturing the code. The system auth
- * session (ASWebAuthenticationSession / Custom Tab) watches this scheme and
- * closes itself; it cannot intercept the http loopback URL directly.
- */
-export const OAUTH_COMPLETION_URI = 'app.capgo.browser://oauth-complete';
 
 export const RESPONSES_API_URL = 'https://api.openai.com/v1/responses';
 

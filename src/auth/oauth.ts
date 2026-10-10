@@ -2,14 +2,14 @@ import {
   AGENT_NAME_HINT,
   OAUTH_AUTHORIZE_URL,
   OAUTH_CALLBACK_PATH,
-  OAUTH_COMPLETION_URI,
   OAUTH_DYNAMIC_CLIENT_ID,
   OAUTH_RESOURCE,
   OAUTH_SCOPES,
   OAUTH_TOKEN_URL,
 } from '../config';
 import { OAuthLoopback } from '@capgo/oauth-loopback';
-import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
+import { InAppBrowser, ToolBarType } from '@capgo/capacitor-inappbrowser';
+import type { PluginListenerHandle } from '@capacitor/core';
 import { Capacitor } from '@capacitor/core';
 import { createOAuthNonce, createOAuthState, createPkcePair } from './pkce';
 import type {
@@ -67,7 +67,6 @@ export async function beginOAuthAttempt(
 
   const loopback = await OAuthLoopback.start({
     path: OAUTH_CALLBACK_PATH,
-    completionUri: Capacitor.isNativePlatform() ? OAUTH_COMPLETION_URI : undefined,
   });
   const redirectUri = loopback.redirectUri;
 
@@ -92,34 +91,61 @@ export async function runAuthorizationInBrowser(
     return runWebLoopbackAuth(attempt, authorizeUrl);
   }
 
-  let sessionError: unknown;
-  try {
-    // OpenAI redirects to the http loopback; our server captures the code and
-    // 302s to OAUTH_COMPLETION_URI, which closes the auth session.
-    await InAppBrowser.openSecureWindow({
-      authEndpoint: authorizeUrl,
-      redirectUri: OAUTH_COMPLETION_URI,
-      prefersEphemeralWebBrowserSession: false,
-    });
-  } catch (error) {
-    sessionError = error;
-  }
+  return runNativeWebViewAuth(attempt, authorizeUrl);
+}
 
-  // The code always arrives through the loopback server, even if the user
-  // closed the sheet by hand after the redirect.
+/** Mobile Safari UA so identity providers (Google) accept the embedded login. */
+const SAFARI_USER_AGENT =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+
+/**
+ * OpenAI only accepts an http://127.0.0.1 redirect. Loading that in Safari
+ * (ASWebAuthenticationSession) shows an insecure-connection warning, so the
+ * login runs in an in-app WKWebView instead: 127.0.0.1 is a blocked host, the
+ * redirect is cancelled before it loads and we read the code from its URL.
+ */
+async function runNativeWebViewAuth(
+  attempt: PendingOAuthAttemptInternal,
+  authorizeUrl: string,
+): Promise<OAuthCallbackParams> {
+  const handles: PluginListenerHandle[] = [];
+  let webViewId: string | undefined;
+  let settled = false;
+
+  const result = new Promise<OAuthCallbackParams>((resolve, reject) => {
+    const finish = (fn: () => void): void => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
+    void InAppBrowser.addListener('urlChangeEvent', (event) => {
+      if (webViewId && event.id && event.id !== webViewId) return;
+      if (!event.url.startsWith(attempt.redirectUri)) return;
+      finish(() => resolve(parseRedirectUri(event.url)));
+    }).then((h) => handles.push(h));
+    void InAppBrowser.addListener('closeEvent', (event) => {
+      if (webViewId && event.id && event.id !== webViewId) return;
+      finish(() => reject(new Error('Sign in was cancelled')));
+    }).then((h) => handles.push(h));
+  });
+
   try {
-    const callback = await OAuthLoopback.waitForCallback({
-      sessionId: attempt.loopbackSessionId,
-      timeoutMs: sessionError ? 1_500 : 10_000,
+    const opened = await InAppBrowser.openWebView({
+      url: authorizeUrl,
+      title: 'Sign in with ChatGPT',
+      toolbarType: ToolBarType.COMPACT,
+      blockedHosts: ['127.0.0.1'],
+      customUserAgent: SAFARI_USER_AGENT,
+      enabledSafeBottomMargin: true,
+      enabledSafeTopMargin: true,
     });
-    if (callback.code || callback.error) {
-      return callback;
-    }
-  } catch {
-    /* timed out: no callback received */
+    webViewId = opened.id;
+    return await result;
+  } finally {
+    settled = true;
+    await Promise.all(handles.map((h) => h.remove()));
+    await InAppBrowser.close(webViewId ? { id: webViewId } : undefined).catch(() => undefined);
   }
-  await OAuthLoopback.stop({ sessionId: attempt.loopbackSessionId }).catch(() => undefined);
-  throw new Error('Sign in was cancelled');
 }
 
 async function runWebLoopbackAuth(
