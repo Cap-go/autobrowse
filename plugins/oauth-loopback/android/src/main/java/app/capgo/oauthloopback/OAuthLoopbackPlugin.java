@@ -31,11 +31,12 @@ public class OAuthLoopbackPlugin extends Plugin {
             path = "/" + path;
         }
         Integer requestedPort = call.getInt("port");
+        String completionUri = call.getString("completionUri");
         int port = requestedPort != null ? requestedPort : findFreePort();
         String sessionId = UUID.randomUUID().toString();
         String redirectUri = "http://127.0.0.1:" + port + path;
 
-        LoopbackSession session = new LoopbackSession(sessionId, port, path);
+        LoopbackSession session = new LoopbackSession(sessionId, port, path, completionUri);
         try {
             session.start();
             sessions.put(sessionId, session);
@@ -101,13 +102,15 @@ public class OAuthLoopbackPlugin extends Plugin {
     private static final class LoopbackSession extends NanoHTTPD {
         private final String sessionId;
         private final String path;
+        private final String completionUri;
         private final CountDownLatch latch = new CountDownLatch(1);
         private final AtomicReference<JSObject> callback = new AtomicReference<>();
 
-        LoopbackSession(String sessionId, int port, String path) {
+        LoopbackSession(String sessionId, int port, String path, String completionUri) {
             super(port);
             this.sessionId = sessionId;
             this.path = path;
+            this.completionUri = completionUri;
         }
 
         void start() throws IOException {
@@ -150,10 +153,23 @@ public class OAuthLoopbackPlugin extends Plugin {
             putIfPresent(obj, "error", params.get("error"));
             putIfPresent(obj, "errorDescription", params.get("error_description"));
 
-            callback.set(obj);
-            latch.countDown();
+            // Ignore stray requests (favicon, retries) so they never wipe the captured code.
+            if (!obj.has("code") && !obj.has("error")) {
+                return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not found");
+            }
+            if (callback.compareAndSet(null, obj)) {
+                latch.countDown();
+            }
 
-            String html = "<html><body><p>Sign in complete. Return to Capgo Browser.</p></body></html>";
+            if (completionUri != null && !completionUri.isEmpty()) {
+                Response redirect = newFixedLengthResponse(Response.Status.REDIRECT, MIME_PLAINTEXT, "");
+                redirect.addHeader("Location", completionUri);
+                return redirect;
+            }
+            String html =
+                "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head>" +
+                "<body style=\"margin:0;height:100vh;display:grid;place-items:center;background:#0b0d12;color:#f4f6fb;font-family:sans-serif;text-align:center\">" +
+                "<div><h2>You're signed in</h2><p>Return to Capgo Browser.</p></div></body></html>";
             return newFixedLengthResponse(Response.Status.OK, "text/html", html);
         }
 

@@ -3,6 +3,11 @@ export interface OAuthLoopbackStartOptions {
   path: string;
   /** Optional fixed port. When omitted the native layer picks a free port. */
   port?: number;
+  /**
+   * After a valid callback the loopback server answers with a 302 to this URI
+   * (an app scheme), so the system auth session closes on its own.
+   */
+  completionUri?: string;
 }
 
 export interface OAuthLoopbackStartResult {

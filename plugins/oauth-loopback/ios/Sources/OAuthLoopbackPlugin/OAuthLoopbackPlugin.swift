@@ -18,11 +18,12 @@ public class OAuthLoopbackPlugin: CAPPlugin, CAPBridgedPlugin {
         let path = call.getString("path") ?? "/auth/callback"
         let normalizedPath = path.hasPrefix("/") ? path : "/\(path)"
         let requestedPort = call.getInt("port")
+        let completionUri = call.getString("completionUri")
         let port = UInt16(requestedPort ?? Int(findFreePort()))
         let sessionId = UUID().uuidString
         let redirectUri = "http://127.0.0.1:\(port)\(normalizedPath)"
 
-        let session = LoopbackSession(id: sessionId, port: port, path: normalizedPath)
+        let session = LoopbackSession(id: sessionId, port: port, path: normalizedPath, completionUri: completionUri)
         session.start { result in
             switch result {
             case .success:
@@ -100,14 +101,16 @@ private final class LoopbackSession {
     private let id: String
     private let port: UInt16
     private let path: String
+    private let completionUri: String?
     private var listener: NWListener?
     private var pendingCallback: (([String: Any]?) -> Void)?
     private var receivedPayload: [String: Any]?
 
-    init(id: String, port: UInt16, path: String) {
+    init(id: String, port: UInt16, path: String, completionUri: String?) {
         self.id = id
         self.port = port
         self.path = path
+        self.completionUri = completionUri
     }
 
     func start(completion: @escaping (Result<Void, Error>) -> Void) {
@@ -168,16 +171,43 @@ private final class LoopbackSession {
             let target = String(parts[1])
             let url = URL(string: "http://127.0.0.1\(target)")
             let payload = Self.parseQuery(url: url, expectedPath: self.path)
-            self.receivedPayload = payload
-            self.pendingCallback?(payload)
-            self.pendingCallback = nil
 
-            let body = "<html><body><p>Sign in complete. Return to Capgo Browser.</p></body></html>"
-            let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
-            connection.send(content: response.data(using: .utf8), completion: .contentProcessed { _ in
-                connection.cancel()
-            })
+            // Ignore anything that is not the OAuth callback (favicon.ico, retries)
+            // so a stray request can never wipe the captured code.
+            guard payload["code"] != nil || payload["error"] != nil else {
+                Self.respond(connection, status: "404 Not Found", headers: [], body: "Not found")
+                return
+            }
+            if self.receivedPayload == nil {
+                self.receivedPayload = payload
+                self.pendingCallback?(payload)
+                self.pendingCallback = nil
+            }
+
+            if let completion = self.completionUri {
+                // Bounce to the app scheme so ASWebAuthenticationSession closes by itself.
+                Self.respond(connection, status: "302 Found", headers: ["Location: \(completion)"], body: "")
+            } else {
+                Self.respond(connection, status: "200 OK", headers: ["Content-Type: text/html; charset=utf-8"], body: Self.donePage)
+            }
         }
+    }
+
+    private static let donePage = """
+    <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>body{margin:0;height:100vh;display:grid;place-items:center;background:#0b0d12;color:#f4f6fb;font:17px -apple-system,system-ui,sans-serif;text-align:center}p{color:#98a1b3}</style>
+    </head><body><div><h2>You're signed in</h2><p>You can close this window and return to Capgo Browser.</p></div></body></html>
+    """
+
+    private static func respond(_ connection: NWConnection, status: String, headers: [String], body: String) {
+        var head = "HTTP/1.1 \(status)\r\n"
+        for header in headers + ["Content-Length: \(body.utf8.count)", "Cache-Control: no-store", "Connection: close"] {
+            head += header + "\r\n"
+        }
+        let response = head + "\r\n" + body
+        connection.send(content: response.data(using: .utf8), completion: .contentProcessed { _ in
+            connection.cancel()
+        })
     }
 
     private static func parseQuery(url: URL?, expectedPath: String) -> [String: Any] {

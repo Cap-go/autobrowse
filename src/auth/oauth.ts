@@ -2,6 +2,7 @@ import {
   AGENT_NAME_HINT,
   OAUTH_AUTHORIZE_URL,
   OAUTH_CALLBACK_PATH,
+  OAUTH_COMPLETION_URI,
   OAUTH_DYNAMIC_CLIENT_ID,
   OAUTH_RESOURCE,
   OAUTH_SCOPES,
@@ -64,7 +65,10 @@ export async function beginOAuthAttempt(
   const isRegistration = !savedClientId;
   const clientId = savedClientId ?? OAUTH_DYNAMIC_CLIENT_ID;
 
-  const loopback = await OAuthLoopback.start({ path: OAUTH_CALLBACK_PATH });
+  const loopback = await OAuthLoopback.start({
+    path: OAUTH_CALLBACK_PATH,
+    completionUri: Capacitor.isNativePlatform() ? OAUTH_COMPLETION_URI : undefined,
+  });
   const redirectUri = loopback.redirectUri;
 
   return {
@@ -88,20 +92,34 @@ export async function runAuthorizationInBrowser(
     return runWebLoopbackAuth(attempt, authorizeUrl);
   }
 
+  let sessionError: unknown;
   try {
-    const { redirectedUri } = await InAppBrowser.openSecureWindow({
+    // OpenAI redirects to the http loopback; our server captures the code and
+    // 302s to OAUTH_COMPLETION_URI, which closes the auth session.
+    await InAppBrowser.openSecureWindow({
       authEndpoint: authorizeUrl,
-      redirectUri: attempt.redirectUri,
+      redirectUri: OAUTH_COMPLETION_URI,
       prefersEphemeralWebBrowserSession: false,
     });
-    return parseRedirectUri(redirectedUri);
-  } catch {
-    await InAppBrowser.open({ url: authorizeUrl });
-    return OAuthLoopback.waitForCallback({
-      sessionId: attempt.loopbackSessionId,
-      timeoutMs: 300_000,
-    });
+  } catch (error) {
+    sessionError = error;
   }
+
+  // The code always arrives through the loopback server, even if the user
+  // closed the sheet by hand after the redirect.
+  try {
+    const callback = await OAuthLoopback.waitForCallback({
+      sessionId: attempt.loopbackSessionId,
+      timeoutMs: sessionError ? 1_500 : 10_000,
+    });
+    if (callback.code || callback.error) {
+      return callback;
+    }
+  } catch {
+    /* timed out: no callback received */
+  }
+  await OAuthLoopback.stop({ sessionId: attempt.loopbackSessionId }).catch(() => undefined);
+  throw new Error('Sign in was cancelled');
 }
 
 async function runWebLoopbackAuth(
@@ -268,17 +286,20 @@ export async function refreshAccessToken(
 
 export async function completeSignIn(savedClientId?: string | null): Promise<OAuthCredentialRecord> {
   const attempt = await beginOAuthAttempt(savedClientId);
-  const authorizeUrl = buildAuthorizeUrl(attempt);
-  const callback = await runAuthorizationInBrowser(attempt, authorizeUrl);
-  const { code, issuedClientId } = validateCallback(attempt, callback);
-  const token = await exchangeAuthorizationCode(attempt, code, issuedClientId);
-  const record = await credentialFromTokenResponse(token, {
-    clientId: issuedClientId,
-    extAgentHostId: attempt.extAgentHostId,
-    nonce: attempt.nonce,
-  });
-  await saveCredentials(record);
-  await setActiveClientId(record.clientId);
-  await OAuthLoopback.stop({ sessionId: attempt.loopbackSessionId });
-  return record;
+  try {
+    const authorizeUrl = buildAuthorizeUrl(attempt);
+    const callback = await runAuthorizationInBrowser(attempt, authorizeUrl);
+    const { code, issuedClientId } = validateCallback(attempt, callback);
+    const token = await exchangeAuthorizationCode(attempt, code, issuedClientId);
+    const record = await credentialFromTokenResponse(token, {
+      clientId: issuedClientId,
+      extAgentHostId: attempt.extAgentHostId,
+      nonce: attempt.nonce,
+    });
+    await saveCredentials(record);
+    await setActiveClientId(record.clientId);
+    return record;
+  } finally {
+    await OAuthLoopback.stop({ sessionId: attempt.loopbackSessionId }).catch(() => undefined);
+  }
 }
