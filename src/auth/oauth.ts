@@ -19,6 +19,7 @@ import type {
   TokenResponse,
 } from './types';
 import { getOrCreateExtAgentHostId } from './host-id';
+import { authRequest } from './http';
 import { verifyIdToken } from './id-token';
 import { decodeJwtPart } from './jwt-encoding';
 import { saveCredentials, setActiveClientId } from './token-store';
@@ -220,18 +221,13 @@ export async function exchangeAuthorizationCode(
   body.set('redirect_uri', attempt.redirectUri);
   body.set('resource', OAUTH_RESOURCE);
 
-  const res = await fetch(OAUTH_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
+  const res = await authRequest(OAUTH_TOKEN_URL, { form: body });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Token exchange failed (${res.status}): ${text}`);
+    throw new Error(`Token exchange failed (${res.status}): ${res.text.slice(0, 300)}`);
   }
 
-  return (await res.json()) as TokenResponse;
+  return JSON.parse(res.text) as TokenResponse;
 }
 
 export async function credentialFromTokenResponse(
@@ -250,6 +246,7 @@ export async function credentialFromTokenResponse(
   const payload = await verifyIdToken(token.id_token, {
     clientId: meta.clientId,
     nonce: meta.nonce || undefined,
+    allowUnverifiedIfJwksUnavailable: true,
   });
 
   const now = Date.now();
@@ -286,18 +283,13 @@ export async function refreshAccessToken(
   body.set('refresh_token', record.refreshToken);
   body.set('resource', OAUTH_RESOURCE);
 
-  const res = await fetch(OAUTH_TOKEN_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
+  const res = await authRequest(OAUTH_TOKEN_URL, { form: body });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Token refresh failed (${res.status}): ${text}`);
+    throw new Error(`Token refresh failed (${res.status}): ${res.text.slice(0, 300)}`);
   }
 
-  const token = (await res.json()) as TokenResponse;
+  const token = JSON.parse(res.text) as TokenResponse;
   const updated = await credentialFromTokenResponse(token, {
     clientId: record.clientId,
     extAgentHostId: record.extAgentHostId,

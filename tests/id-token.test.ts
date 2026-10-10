@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { OAUTH_ISSUER } from '../src/config';
-import { verifyIdToken } from '../src/auth/id-token';
+import { JwksUnavailableError, verifyIdToken } from '../src/auth/id-token';
 import { base64UrlEncode } from '../src/auth/pkce';
 
 function encodePart(value: unknown): string {
@@ -100,5 +100,30 @@ describe('verifyIdToken', () => {
         verificationKeyResolver: async () => otherPair.publicKey,
       }),
     ).rejects.toThrow('signature');
+  });
+});
+
+describe('verifyIdToken JWKS fallback', () => {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const token = [
+    encodePart({ alg: 'RS256', kid: 'k1' }),
+    encodePart({ iss: 'https://auth.openai.com', aud: 'client', exp: nowSec + 60, sub: 'u' }),
+    'c2ln',
+  ].join('.');
+  const unavailable = async (): Promise<CryptoKey> => {
+    throw new JwksUnavailableError('down');
+  };
+
+  test('skips signature only when allowed and JWKS is unavailable', async () => {
+    const claims = await verifyIdToken(token, {
+      clientId: 'client',
+      verificationKeyResolver: unavailable,
+      allowUnverifiedIfJwksUnavailable: true,
+    });
+    expect(claims.sub).toBe('u');
+  });
+
+  test('still fails when fallback is not allowed', async () => {
+    expect(verifyIdToken(token, { clientId: 'client', verificationKeyResolver: unavailable })).rejects.toThrow();
   });
 });

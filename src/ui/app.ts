@@ -695,7 +695,7 @@ function friendlyError(error: unknown): string {
   if (/cancel/i.test(message)) {
     return 'Sign in was cancelled.';
   }
-  if (/network|fetch|offline/i.test(message)) {
+  if (!navigator.onLine || /internet connection appears to be offline|network connection was lost/i.test(message)) {
     return 'No connection. Check your internet and try again.';
   }
   return message || 'Something went wrong. Please try again.';

@@ -1,5 +1,9 @@
 import { OAUTH_ISSUER, OAUTH_JWKS_URL } from '../config';
+import { authRequest } from './http';
 import { base64UrlToBytes, decodeJwtPart } from './jwt-encoding';
+
+/** JWKS could not be fetched (network, Cloudflare challenge). */
+export class JwksUnavailableError extends Error {}
 
 interface JwkRsa {
   kty: 'RSA';
@@ -38,11 +42,16 @@ async function fetchJwks(force = false): Promise<JwkRsa[]> {
   if (!force && cachedJwks && now - cachedJwks.fetchedAtMs < JWKS_TTL_MS) {
     return cachedJwks.keys;
   }
-  const res = await fetch(OAUTH_JWKS_URL);
+  const res = await authRequest(OAUTH_JWKS_URL);
   if (!res.ok) {
-    throw new Error(`Failed to fetch JWKS (${res.status})`);
+    throw new JwksUnavailableError(`JWKS request failed (${res.status})`);
   }
-  const body = (await res.json()) as JwksResponse;
+  let body: JwksResponse;
+  try {
+    body = JSON.parse(res.text) as JwksResponse;
+  } catch {
+    throw new JwksUnavailableError('JWKS response was not JSON');
+  }
   const keys = body.keys ?? [];
   cachedJwks = { fetchedAtMs: now, keys };
   return keys;
@@ -98,6 +107,12 @@ export interface VerifyIdTokenOptions {
   nonce?: string;
   issuer?: string;
   jwksFetcher?: () => Promise<JwkRsa[]>;
+  /**
+   * The token came straight from the token endpoint over TLS, so the
+   * signature check may be skipped when JWKS is unreachable (OIDC Core
+   * 3.1.3.7). Claims are always validated.
+   */
+  allowUnverifiedIfJwksUnavailable?: boolean;
   verificationKeyResolver?: (header: JwtHeader) => Promise<CryptoKey>;
 }
 
@@ -114,21 +129,32 @@ export async function verifyIdToken(
   const header = decodeJwtPart<JwtHeader>(encodedHeader);
   const payload = decodeJwtPart<IdTokenClaims>(encodedPayload);
 
-  const key = options.verificationKeyResolver
-    ? await options.verificationKeyResolver(header)
-    : await resolveVerificationKey(header);
+  let key: CryptoKey | null = null;
+  try {
+    key = options.verificationKeyResolver
+      ? await options.verificationKeyResolver(header)
+      : await resolveVerificationKey(header);
+  } catch (error) {
+    const unavailable =
+      error instanceof JwksUnavailableError || (error instanceof TypeError && !options.verificationKeyResolver);
+    if (!(options.allowUnverifiedIfJwksUnavailable && unavailable)) {
+      throw error;
+    }
+  }
 
-  const signedData = new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`);
-  const signatureBytes = base64UrlToBytes(encodedSignature);
-  const signature = new Uint8Array(signatureBytes);
-  const valid = await crypto.subtle.verify(
-    { name: 'RSASSA-PKCS1-v1_5' },
-    key,
-    signature,
-    signedData,
-  );
-  if (!valid) {
-    throw new Error('ID token signature verification failed');
+  if (key) {
+    const signedData = new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`);
+    const signatureBytes = base64UrlToBytes(encodedSignature);
+    const signature = new Uint8Array(signatureBytes);
+    const valid = await crypto.subtle.verify(
+      { name: 'RSASSA-PKCS1-v1_5' },
+      key,
+      signature,
+      signedData,
+    );
+    if (!valid) {
+      throw new Error('ID token signature verification failed');
+    }
   }
 
   const issuer = options.issuer ?? OAUTH_ISSUER;
