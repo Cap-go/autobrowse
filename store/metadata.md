@@ -8,6 +8,7 @@ Copy/paste source for App Store Connect. Character limits noted.
 | --- | --- |
 | Name (30) | Capgo Browser |
 | Subtitle (30) | AI agent that browses for you |
+| Apple ID | 6821215230 |
 | Bundle ID | app.capgo.browser |
 | SKU | capgo-browser-ios |
 | Primary language | English (U.S.) |
@@ -94,7 +95,7 @@ App icon 1024×1024 (no alpha): `store/icon/AppIcon-1024.png` (also inside the X
 | User generated content / messaging between users | No |
 | Medical or treatment info | No |
 | Parental controls / age assurance | No |
-| Result | 18+ (driven by unrestricted web access, expected for browsers) |
+| Result | 16+ (calculated by App Store Connect) |
 
 ## App Privacy (nutrition label)
 
