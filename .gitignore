@@ -1,0 +1,13 @@
+node_modules/
+dist/
+dist-tsc/
+.DS_Store
+.idea/
+.vscode/
+*.log
+android/.gradle/
+android/app/build/
+android/build/
+ios/App/Pods/
+ios/App/build/
+*.local
