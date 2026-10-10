@@ -23,12 +23,12 @@ Copy/paste source for App Store Connect. Character limits noted.
 
 | Field | Value |
 | --- | --- |
-| Privacy Policy URL | https://capgo.app/browser/privacy/ |
-| Terms (EULA, in description or custom EULA) | https://capgo.app/browser/terms/ |
-| Support URL | https://capgo.app/browser/support/ |
-| Marketing URL | https://capgo.app/browser/ |
+| Privacy Policy URL | https://capgo.app/privacy/ |
+| Terms (EULA, in description or custom EULA) | https://capgo.app/tos/ |
+| Support URL | https://capgo.app/contact/ |
+| Marketing URL | https://capgo.app/ |
 
-Pages content lives in `store/legal/*.md`. They must be live before submission.
+Uses existing Capgo pages. `store/legal/*.md` holds app-specific drafts if dedicated pages are wanted later.
 
 ## Promotional text (170)
 
@@ -63,8 +63,8 @@ Use Capgo Browser as a simple, fast browser. Sign in only when you want the agen
 
 Capgo Browser is made by Capgo. It is not affiliated with or endorsed by OpenAI. ChatGPT is a trademark of OpenAI.
 
-Terms of Use: https://capgo.app/browser/terms/
-Privacy Policy: https://capgo.app/browser/privacy/
+Terms of Use: https://capgo.app/tos/
+Privacy Policy: https://capgo.app/privacy/
 
 ## Keywords (100, comma separated, no spaces)
 
