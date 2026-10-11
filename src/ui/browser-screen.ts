@@ -1,6 +1,7 @@
 import type { OAuthCredentialRecord } from '../auth/types';
 import { appendUserMessage, createInitialState, runAgentTurn, type AgentLoopState } from '../agent/loop';
 import { BrowserTab } from '../browser/browser-controller';
+import { isAppActive, onAppActiveChange } from '../agent/lifecycle';
 import { h, icon } from './dom';
 import {
   autoGrow,
@@ -385,7 +386,9 @@ export class BrowserScreen {
   private syncStatus(): void {
     const tab = this.active;
     this.status.replaceChildren();
-    if (tab.busy) {
+    if (tab.busy && !isAppActive()) {
+      this.status.append(h('span', {}, 'Paused · continues when you are back'));
+    } else if (tab.busy) {
       this.status.append(h('span', { class: 'spinner' }), h('span', {}, 'Agent is working…'));
     } else if (tab.browser.isOpen) {
       this.status.append(h('span', {}, tab.browser.title || prettyUrl(tab.browser.url ?? '')));
@@ -500,6 +503,18 @@ export class BrowserScreen {
 
     const voice = new VoiceInput();
     this.cleanups.push(() => void voice.stop());
+    // Leaving the app pauses the agent (see agent/lifecycle) and ends dictation.
+    this.cleanups.push(
+      onAppActiveChange((active) => {
+        if (!active) void voice.stop();
+        else {
+          this.syncFrame();
+          this.syncVisibility();
+        }
+        this.syncStatus();
+        if (active && this.runningCount) toast('Welcome back, the agent continues.');
+      }),
+    );
     mic.addEventListener('click', async () => {
       if (voice.listening) {
         await voice.stop();
@@ -510,6 +525,7 @@ export class BrowserScreen {
         return;
       }
       const reset = (): void => {
+        mic.style.removeProperty('--level');
         mic.classList.remove('listening');
         mic.replaceChildren(icon('mic'));
         this.syncComposer();
@@ -517,12 +533,17 @@ export class BrowserScreen {
       mic.classList.add('listening');
       mic.replaceChildren(icon('stop'));
       this.input.value = '';
-      this.input.placeholder = 'Listening…';
+      this.input.placeholder = 'Listening… tap ■ when done';
       try {
         await voice.start({
           onPartial: (text) => {
             this.input.value = text;
             autoGrow(this.input);
+          },
+          onLevel: (level) => {
+            // level is ~0..1 (Android dB values are clamped).
+            const v = Math.max(0, Math.min(1, level > 1 ? level / 10 : level));
+            mic.style.setProperty('--level', String(v));
           },
           onEnd: (text) => {
             reset();

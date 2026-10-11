@@ -1924,3 +1924,11 @@ body {
 .page-area {
   background: var(--bg-2);
 }
+
+.mic.listening {
+  animation: none;
+  background: var(--text);
+  color: var(--bg);
+  box-shadow: 0 0 0 calc(3px + var(--level, 0) * 10px) rgba(236, 236, 236, 0.22);
+  transition: box-shadow 0.08s linear;
+}

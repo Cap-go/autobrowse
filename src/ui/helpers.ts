@@ -107,8 +107,11 @@ export function friendlyError(error: unknown): string {
   if (/cancel/i.test(message)) {
     return 'Sign in was cancelled.';
   }
-  if (!navigator.onLine || /internet connection appears to be offline|network connection was lost/i.test(message)) {
-    return 'No connection. Check your internet and try again.';
+  if (/internet connection appears to be offline/i.test(message)) {
+    return 'You are offline. Check your connection and try again.';
+  }
+  if (/network connection was lost|load failed|timed out/i.test(message)) {
+    return `The connection dropped while the agent was working (${message}). Send "continue" to pick up where it stopped.`;
   }
   return message || 'Something went wrong. Please try again.';
 }

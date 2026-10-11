@@ -2,6 +2,7 @@ import type { OAuthCredentialRecord } from '../auth/types';
 import { type BrowserTab, defaultTab } from '../browser/browser-controller';
 import { refreshAccessToken } from '../auth/oauth';
 import { runBrowserTool } from './browser-tools-runner';
+import { isAppActive, whenActive } from './lifecycle';
 import { createResponseStream } from './responses-api';
 import type { AgentConversationItem, ToolCallResult, ToolOutput } from './types';
 
@@ -47,6 +48,57 @@ async function withFreshToken<T>(
   }
 }
 
+/** Keep this many most recent tool outputs in full; older ones are trimmed. */
+const FULL_OUTPUTS = 4;
+const TRIMMED_OUTPUT_CHARS = 800;
+
+/**
+ * Every step resends the whole history (store:false), so screenshots and page
+ * dumps pile up and long tasks hit request-size/network limits. Keep only the
+ * latest screenshot image and trim older tool outputs.
+ */
+export function compactHistory(items: AgentConversationItem[]): AgentConversationItem[] {
+  const outputIndexes = items
+    .map((item, index) => ('type' in item && item.type === 'function_call_output' ? index : -1))
+    .filter((index) => index >= 0);
+  const keepFull = new Set(outputIndexes.slice(-FULL_OUTPUTS));
+  let lastImage = -1;
+  for (const index of outputIndexes) {
+    const item = items[index] as { output: ToolOutput };
+    if (Array.isArray(item.output) && item.output.some((part) => part.type === 'input_image')) lastImage = index;
+  }
+  return items.map((item, index) => {
+    if (!('type' in item) || item.type !== 'function_call_output') return item;
+    if (Array.isArray(item.output)) {
+      if (index === lastImage) return item;
+      const text = item.output.filter((part) => part.type === 'input_text').map((part) => part.text).join(' ');
+      return { ...item, output: `${text} [older screenshot removed]`.trim() };
+    }
+    if (keepFull.has(index) || item.output.length <= TRIMMED_OUTPUT_CHARS) return item;
+    return { ...item, output: `${item.output.slice(0, TRIMMED_OUTPUT_CHARS)}… [trimmed]` };
+  });
+}
+
+const NETWORK_ERROR = /load failed|network connection was lost|timed out|timeout|failed to fetch|socket|ECONNRESET/i;
+
+async function withNetworkRetry<T>(fn: () => Promise<T>): Promise<T> {
+  let attempt = 0;
+  for (;;) {
+    await whenActive();
+    try {
+      return await fn();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // A request cut by backgrounding/locking is retried once the app is back.
+      const interrupted = !isAppActive();
+      if (!NETWORK_ERROR.test(message) && !interrupted) throw error;
+      attempt += 1;
+      if (attempt > 2) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
+    }
+  }
+}
+
 /** Tool-using steps per user message before the agent must answer. */
 export const MAX_TOOL_STEPS = 40;
 
@@ -63,6 +115,7 @@ export async function runAgentTurn(
 
   let budgetSpent = false;
   for (let step = 1; step <= MAX_TOOL_STEPS + 1; step++) {
+    await whenActive();
     if (hooks?.shouldStop?.()) break;
     // After the tool budget, ask once more with tools disabled so the user
     // always gets an answer built from what was found.
@@ -76,7 +129,9 @@ export async function runAgentTurn(
     }
     hooks?.onStepStart?.(step);
     const response = await withFreshToken(credentials, async (accessToken) => {
-      const stream = await createResponseStream({ accessToken, messages, noTools: finalAnswer });
+      const stream = await withNetworkRetry(() =>
+        createResponseStream({ accessToken, messages: compactHistory(messages), noTools: finalAnswer }),
+      );
       let parsed;
       for await (const event of stream) {
         if (event.type === 'text_delta') {
@@ -107,6 +162,8 @@ export async function runAgentTurn(
       });
     }
     for (const call of turn.toolCalls) {
+      // Browser actions need the app in the foreground.
+      await whenActive();
       hooks?.onToolStart?.(call.name, call.arguments);
       let output: ToolOutput;
       let ok = true;

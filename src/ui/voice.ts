@@ -3,15 +3,31 @@ import { SpeechRecognition } from '@capgo/capacitor-speech-recognition';
 
 export interface VoiceHandlers {
   onPartial: (text: string) => void;
+  onLevel?: (level: number) => void;
   onEnd: (finalText: string) => void;
   onError: (message: string) => void;
 }
 
-/** Push-to-talk dictation with live partial results (on-device when available). */
+/** Stop after this much silence once something was said. */
+const SILENCE_MS = 1_500;
+/** Hard cap for one dictation. */
+const MAX_MS = 45_000;
+
+/**
+ * Tap-to-talk dictation with live partial results.
+ *
+ * ChatGPT plan tokens cannot call OpenAI transcription (not supported by Sign
+ * in with ChatGPT), so this uses the platform recognizer (Apple Speech /
+ * Android SpeechRecognizer). iOS never stops on its own, so silence is
+ * detected here.
+ */
 export class VoiceInput {
   private handles: PluginListenerHandle[] = [];
   private latest = '';
   private active = false;
+  private silenceTimer: ReturnType<typeof setTimeout> | undefined;
+  private maxTimer: ReturnType<typeof setTimeout> | undefined;
+  private handlers: VoiceHandlers | null = null;
 
   get listening(): boolean {
     return this.active;
@@ -30,24 +46,33 @@ export class VoiceInput {
       status = await SpeechRecognition.requestPermissions();
     }
     if (status.speechRecognition !== 'granted') {
-      throw new Error('Allow microphone and speech recognition in Settings to use voice.');
+      throw new Error('Allow microphone and speech recognition for Auto Browse in Settings to use voice.');
     }
+
+    // A previous session may still be alive (e.g. after an error): clear it.
+    await SpeechRecognition.forceStop().catch(() => undefined);
 
     this.latest = '';
     this.active = true;
+    this.handlers = handlers;
     this.handles.push(
       await SpeechRecognition.addListener('partialResults', (event) => {
-        this.latest = event.accumulated ?? event.matches?.[0] ?? this.latest;
-        handlers.onPartial(this.latest);
+        const text = event.accumulated ?? event.matches?.[0] ?? '';
+        if (!text) return;
+        this.latest = text;
+        handlers.onPartial(text);
+        this.armSilenceTimer();
       }),
+      await SpeechRecognition.addListener('audioLevel', (event) => handlers.onLevel?.(event.level)),
       await SpeechRecognition.addListener('listeningState', (event) => {
-        if (event.state === 'stopped') void this.finish(handlers);
+        if (event.state === 'stopped') void this.finish();
       }),
       await SpeechRecognition.addListener('error', (event) => {
-        handlers.onError(event.message || 'Voice input failed');
-        void this.finish(handlers);
+        if (!this.latest) handlers.onError(event.message || 'Voice input failed');
+        void this.finish();
       }),
     );
+    this.maxTimer = setTimeout(() => void this.stop(), MAX_MS);
 
     try {
       const result = await SpeechRecognition.start({
@@ -59,22 +84,36 @@ export class VoiceInput {
       const final = result.matches?.[0];
       if (final) this.latest = final;
     } catch (error) {
-      handlers.onError(error instanceof Error ? error.message : String(error));
-      await this.finish(handlers);
+      const message = error instanceof Error ? error.message : String(error);
+      if (!this.latest) handlers.onError(message);
+      await this.finish();
     }
   }
 
+  /** Stop listening and deliver what was heard. */
   async stop(): Promise<void> {
     if (!this.active) return;
     await SpeechRecognition.stop().catch(() => undefined);
+    // Some platforms do not emit "stopped" after a manual stop.
+    setTimeout(() => void this.finish(), 400);
   }
 
-  private async finish(handlers: VoiceHandlers): Promise<void> {
+  private armSilenceTimer(): void {
+    clearTimeout(this.silenceTimer);
+    this.silenceTimer = setTimeout(() => void this.stop(), SILENCE_MS);
+  }
+
+  private async finish(): Promise<void> {
     if (!this.active) return;
     this.active = false;
+    clearTimeout(this.silenceTimer);
+    clearTimeout(this.maxTimer);
     const handles = this.handles;
     this.handles = [];
     await Promise.all(handles.map((h) => h.remove()));
-    handlers.onEnd(this.latest.trim());
+    await SpeechRecognition.forceStop().catch(() => undefined);
+    const handlers = this.handlers;
+    this.handlers = null;
+    handlers?.onEnd(this.latest.trim());
   }
 }

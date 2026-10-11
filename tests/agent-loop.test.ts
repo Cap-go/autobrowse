@@ -328,3 +328,40 @@ describe('namespaced tool calls', () => {
     expect(parsed.toolCalls[0]?.namespace).toBe('capgo_browser');
   });
 });
+
+describe('history compaction', () => {
+  test('keeps only the latest screenshot and trims old outputs', async () => {
+    const { compactHistory } = await import('../src/agent/loop');
+    const big = 'x'.repeat(5000);
+    const shot = (id: string) => ({
+      type: 'function_call_output' as const, call_id: id,
+      output: [{ type: 'input_text' as const, text: '{"ok":true}' }, { type: 'input_image' as const, image_url: 'data:x', detail: 'auto' as const }],
+    });
+    const text = (id: string) => ({ type: 'function_call_output' as const, call_id: id, output: big });
+    const items = [shot('s1'), text('t1'), text('t2'), text('t3'), text('t4'), text('t5'), shot('s2')];
+    const out = compactHistory(items) as Array<{ output: unknown }>;
+    expect(typeof out[0]?.output).toBe('string');
+    expect(String(out[1]?.output).length).toBeLessThan(1000);
+    expect(out[5]?.output).toBe(big);
+    expect(Array.isArray(out[6]?.output)).toBe(true);
+  });
+});
+
+describe('lifecycle', () => {
+  test('the agent waits while the app is in the background and resumes after', async () => {
+    const lifecycle = await import('../src/agent/lifecycle');
+    lifecycle.setAppActive(false);
+    responses.push(sse([completed([message('Back again.')])]));
+    let done = false;
+    const run = runAgentTurn(creds, createInitialState('Pause test')).then((r) => {
+      done = true;
+      return r;
+    });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(done).toBe(false);
+    expect(requests).toHaveLength(0);
+    lifecycle.setAppActive(true);
+    const result = await run;
+    expect(result.assistantText).toContain('Back again.');
+  });
+});
