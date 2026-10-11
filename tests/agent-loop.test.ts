@@ -289,11 +289,11 @@ describe('namespaced tool calls', () => {
           id: 'fc_1',
           call_id: 'call_ns',
           name: 'browser_read_dom',
-          namespace: 'browser',
+          namespace: 'capgo_browser',
           arguments: '{}',
         },
       ],
     });
-    expect(parsed.toolCalls[0]?.namespace).toBe('browser');
+    expect(parsed.toolCalls[0]?.namespace).toBe('capgo_browser');
   });
 });

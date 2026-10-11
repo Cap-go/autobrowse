@@ -93,11 +93,11 @@ export const BROWSER_TOOLS: FunctionToolDefinition[] = [
 
 /**
  * ChatGPT plan usage only accepts function tools grouped in a namespace
- * (see SIWC "Preview limitations").
+ * (see SIWC "Preview limitations"). `browser` is reserved by OpenAI.
  */
 export const BROWSER_TOOL_NAMESPACE = {
   type: 'namespace',
-  name: 'browser',
+  name: 'capgo_browser',
   description: 'Control the in-app web browser: open pages, read them, click, type and scroll.',
   tools: BROWSER_TOOLS,
 } as const;
