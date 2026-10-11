@@ -90,3 +90,14 @@ export const BROWSER_TOOLS: FunctionToolDefinition[] = [
     },
   },
 ];
+
+/**
+ * ChatGPT plan usage only accepts function tools grouped in a namespace
+ * (see SIWC "Preview limitations").
+ */
+export const BROWSER_TOOL_NAMESPACE = {
+  type: 'namespace',
+  name: 'browser',
+  description: 'Control the in-app web browser: open pages, read them, click, type and scroll.',
+  tools: BROWSER_TOOLS,
+} as const;

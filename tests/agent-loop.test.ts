@@ -278,3 +278,22 @@ describe('browser lifecycle', () => {
     expect(browserPlugin.dispatchInputEvent).not.toHaveBeenCalled();
   });
 });
+
+describe('namespaced tool calls', () => {
+  test('parseResponsesJson keeps the tool namespace', () => {
+    const parsed = parseResponsesJson({
+      id: 'resp_ns',
+      output: [
+        {
+          type: 'function_call',
+          id: 'fc_1',
+          call_id: 'call_ns',
+          name: 'browser_read_dom',
+          namespace: 'browser',
+          arguments: '{}',
+        },
+      ],
+    });
+    expect(parsed.toolCalls[0]?.namespace).toBe('browser');
+  });
+});

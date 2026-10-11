@@ -83,6 +83,7 @@ export async function runAgentTurn(
         type: 'function_call',
         call_id: call.callId,
         name: call.name,
+        ...(call.namespace ? { namespace: call.namespace } : {}),
         arguments: JSON.stringify(call.arguments),
       });
     }

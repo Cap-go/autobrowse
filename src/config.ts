@@ -23,9 +23,10 @@ export const OAUTH_CALLBACK_PATH = '/auth/callback';
 
 
 export const RESPONSES_API_URL = 'https://api.openai.com/v1/responses';
+export const MODELS_API_URL = 'https://api.openai.com/v1/models';
 
-/** Model for ChatGPT plan usage via Responses API (adjust when OpenAI documents a default). */
-export const RESPONSES_MODEL = 'gpt-4.1';
+/** Preferred model; falls back to the first model listed for the account. */
+export const RESPONSES_MODEL = 'gpt-6.1-sol';
 
 export const SECURE_STORAGE_KEYS = {
   hostId: 'capgo_browser_ext_agent_host_id',

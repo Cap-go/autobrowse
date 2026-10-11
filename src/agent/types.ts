@@ -18,13 +18,14 @@ export type ToolOutput = string | Array<
 >;
 
 export type AgentConversationItem = AgentMessage
-  | { type: 'function_call'; call_id: string; name: BrowserToolName; arguments: string }
+  | { type: 'function_call'; call_id: string; name: BrowserToolName; namespace?: string; arguments: string }
   | { type: 'function_call_output'; call_id: string; output: ToolOutput };
 
 export interface ToolCallRequest {
   id: string;
   callId: string;
   name: BrowserToolName;
+  namespace?: string;
   arguments: Record<string, unknown>;
 }
 

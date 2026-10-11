@@ -1,6 +1,7 @@
-import { RESPONSES_API_URL, RESPONSES_MODEL } from '../config';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { MODELS_API_URL, RESPONSES_API_URL, RESPONSES_MODEL } from '../config';
 import { formatApiError } from './errors';
-import { BROWSER_TOOLS } from './tools';
+import { BROWSER_TOOL_NAMESPACE } from './tools';
 import type { AgentConversationItem, ToolCallRequest } from './types';
 
 export interface ResponsesApiOptions {
@@ -22,23 +23,60 @@ const INSTRUCTIONS = 'You are Capgo Browser, a mobile browsing agent. Use the br
   'to browse and read the page before clicking. Ask the user before submitting payments, ' +
   'making purchases, making account changes, or sending messages. Keep replies short.';
 
+let cachedModel: { token: string; slug: string } | null = null;
+
+/** Pick a model from the signed-in account's catalog (ChatGPT plans differ). */
+export async function resolveModel(accessToken: string): Promise<string> {
+  if (cachedModel?.token === accessToken) return cachedModel.slug;
+  let slug = RESPONSES_MODEL;
+  try {
+    const res = await httpRequest(MODELS_API_URL, 'GET', accessToken);
+    if (res.status === 200) {
+      const body = JSON.parse(res.text) as { models?: Array<{ slug?: string; visibility?: string }> };
+      const listed = (body.models ?? []).filter((m) => m.slug && m.visibility === 'list');
+      const preferred = listed.find((m) => m.slug === RESPONSES_MODEL) ?? listed[0];
+      if (preferred?.slug) slug = preferred.slug;
+    }
+  } catch {
+    /* keep default */
+  }
+  cachedModel = { token: accessToken, slug };
+  return slug;
+}
+
 export async function createResponseStream(
   options: ResponsesApiOptions,
 ): Promise<AsyncIterable<StreamEvent>> {
+  const model = await resolveModel(options.accessToken);
+  const body = JSON.stringify({
+    model,
+    input: options.messages,
+    instructions: INSTRUCTIONS,
+    tools: [BROWSER_TOOL_NAMESPACE],
+    stream: true,
+    store: false,
+  });
+
+  if (Capacitor.isNativePlatform()) {
+    // The WebView turns some errors (no CORS headers on admission failures)
+    // into an opaque "Load failed". Native HTTP returns the real status and
+    // body; the SSE text is buffered and parsed once complete.
+    const res = await httpRequest(RESPONSES_API_URL, 'POST', options.accessToken, body);
+    if (res.status < 200 || res.status >= 300) {
+      throw new Error(formatApiError(res.status, res.text));
+    }
+    const stream = new Response(res.text).body;
+    if (!stream) throw new Error('Responses API returned an empty body');
+    return parseSseStream(stream);
+  }
+
   const res = await fetch(RESPONSES_API_URL, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${options.accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: RESPONSES_MODEL,
-      input: options.messages,
-      instructions: INSTRUCTIONS,
-      tools: BROWSER_TOOLS,
-      stream: true,
-      store: false,
-    }),
+    body,
   });
 
   if (!res.ok) {
@@ -46,6 +84,31 @@ export async function createResponseStream(
   }
   if (!res.body) throw new Error('Responses API returned an empty body');
   return parseSseStream(res.body);
+}
+
+async function httpRequest(
+  url: string,
+  method: 'GET' | 'POST',
+  accessToken: string,
+  body?: string,
+): Promise<{ status: number; text: string }> {
+  const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` };
+  if (body) headers['Content-Type'] = 'application/json';
+  if (Capacitor.isNativePlatform()) {
+    const res = await CapacitorHttp.request({
+      url,
+      method,
+      headers,
+      data: body ? JSON.parse(body) : undefined,
+      responseType: 'text',
+      readTimeout: 180_000,
+      connectTimeout: 30_000,
+    });
+    const text = typeof res.data === 'string' ? res.data : JSON.stringify(res.data ?? '');
+    return { status: res.status, text };
+  }
+  const res = await fetch(url, { method, headers, body });
+  return { status: res.status, text: await res.text() };
 }
 
 async function* parseSseStream(body: ReadableStream<Uint8Array>): AsyncIterable<StreamEvent> {
@@ -133,6 +196,7 @@ export function parseResponsesJson(payload: Record<string, unknown>): ParsedAssi
         id: String(item.id ?? ''),
         callId: String(item.call_id),
         name: String(item.name ?? '') as ToolCallRequest['name'],
+        namespace: item.namespace ? String(item.namespace) : undefined,
         arguments: JSON.parse(String(item.arguments || '{}')) as Record<string, unknown>,
       });
     }
