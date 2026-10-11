@@ -454,8 +454,6 @@ export class BrowserScreen {
     this.status.replaceChildren();
     if (tab.busy && !isAppActive()) {
       this.status.append(h('span', {}, 'Paused · continues when you are back'));
-    } else if (tab.busy) {
-      this.status.append(h('span', { class: 'spinner' }), h('span', {}, 'Agent is working…'));
     } else if (tab.browser.isOpen) {
       this.status.append(h('span', {}, tab.browser.title || prettyUrl(tab.browser.url ?? '')));
     } else {
@@ -684,6 +682,8 @@ export class BrowserScreen {
             scrollToEnd(log);
           },
           onToolStart: (name, args) => {
+            // One progress indicator: the steps line replaces the dot.
+            thinking.remove();
             steps.start(toolLabel(name, args));
             scrollToEnd(log);
           },
@@ -843,6 +843,7 @@ class StepsBlock {
     const li = this.list.lastElementChild;
     li?.classList.remove('running');
     li?.classList.add(ok ? 'ok' : 'failed');
+    this.renderHead(true, 'Thinking…');
   }
 
   finish(): void {
