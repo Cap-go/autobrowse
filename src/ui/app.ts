@@ -265,6 +265,7 @@ export class App {
       if (e.target === backdrop) close();
     });
     sheet.querySelector('.sheet-head .icon-btn')?.addEventListener('click', close);
+    bindSheetDrag(sheet, backdrop, close);
     document.body.append(backdrop);
     return close;
   }
@@ -464,4 +465,77 @@ async function currentBundle(): Promise<string> {
   } catch {
     return `Version ${APP_VERSION}`;
   }
+}
+
+/**
+ * Drag a sheet down to dismiss it, like iOS sheets. Drags start on the grabber
+ * or header, or on the content when it is scrolled to the top. Past a quarter
+ * of the height (or a quick flick) it closes; otherwise it springs back.
+ */
+function bindSheetDrag(sheet: HTMLElement, backdrop: HTMLElement, close: () => void): void {
+  let startY = 0;
+  let lastY = 0;
+  let lastT = 0;
+  let velocity = 0;
+  let dragging = false;
+  let pending = false;
+
+  const begin = (y: number): void => {
+    startY = y;
+    lastY = y;
+    lastT = performance.now();
+    velocity = 0;
+    pending = true;
+  };
+  const move = (y: number, e: TouchEvent): void => {
+    if (!pending && !dragging) return;
+    const dy = y - startY;
+    if (pending) {
+      // Only take over for a downward drag; let content scroll otherwise.
+      if (dy < 6) return;
+      pending = false;
+      dragging = true;
+      sheet.style.transition = 'none';
+      backdrop.style.transition = 'none';
+    }
+    e.preventDefault();
+    const now = performance.now();
+    velocity = (y - lastY) / Math.max(1, now - lastT);
+    lastY = y;
+    lastT = now;
+    const offset = Math.max(0, dy);
+    sheet.style.transform = `translateY(${offset}px)`;
+    backdrop.style.backgroundColor = `rgba(0, 0, 0, ${0.5 * Math.max(0, 1 - offset / sheet.offsetHeight)})`;
+  };
+  const end = (): void => {
+    pending = false;
+    if (!dragging) return;
+    dragging = false;
+    const offset = Math.max(0, lastY - startY);
+    sheet.style.transition = 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)';
+    backdrop.style.transition = 'background-color 0.25s ease';
+    if (offset > sheet.offsetHeight * 0.25 || velocity > 0.6) {
+      sheet.style.transform = 'translateY(100%)';
+      backdrop.style.backgroundColor = 'rgba(0, 0, 0, 0)';
+      close();
+    } else {
+      sheet.style.transform = '';
+      backdrop.style.backgroundColor = '';
+    }
+  };
+
+  sheet.addEventListener(
+    'touchstart',
+    (e) => {
+      const target = e.target as HTMLElement;
+      const onHandle = !!target.closest('.sheet-grabber, .sheet-head');
+      const interactive = !!target.closest('input, textarea, select');
+      if (interactive) return;
+      if (onHandle || sheet.scrollTop <= 0) begin(e.touches[0]?.clientY ?? 0);
+    },
+    { passive: true },
+  );
+  sheet.addEventListener('touchmove', (e) => move(e.touches[0]?.clientY ?? 0, e), { passive: false });
+  sheet.addEventListener('touchend', end);
+  sheet.addEventListener('touchcancel', end);
 }

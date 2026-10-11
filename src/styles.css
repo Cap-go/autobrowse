@@ -2399,3 +2399,19 @@ body {
   width: 18px;
   height: 18px;
 }
+
+/* Bigger touch target for the sheet grabber (drag to dismiss). */
+.sheet-grabber {
+  position: relative;
+  touch-action: none;
+}
+
+.sheet-grabber::after {
+  content: '';
+  position: absolute;
+  inset: -14px -60px;
+}
+
+.sheet-head {
+  touch-action: none;
+}
