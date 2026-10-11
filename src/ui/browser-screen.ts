@@ -702,6 +702,11 @@ export class BrowserScreen {
     log.append(turn);
     scrollToEnd(log);
 
+    // The live status line always sits after the latest card/answer in the turn.
+    const keepStepsLast = (): void => {
+      turn.insertBefore(steps.el, answer);
+      steps.renderRunning();
+    };
     let streamed = '';
     const openLink = (url: string): void => this.openUrl(tab, url);
     const renderAnswer = (value: string): void => {
@@ -731,17 +736,22 @@ export class BrowserScreen {
             scrollToEnd(log);
           },
           onToolEnd: (_name, ok) => steps.end(ok),
-          askUser: (request) => {
+          askUser: async (request) => {
             steps.waiting('Waiting for your answer');
-            return this.askCard(tab, turn, thinking, request);
+            const result = await this.askCard(tab, turn, thinking, request);
+            keepStepsLast();
+            return result;
           },
           exportFile: (file) => {
             turn.insertBefore(fileCard(file.filename, file.content), thinking.isConnected ? thinking : answer);
+            keepStepsLast();
             scrollToEnd(log);
           },
-          requestSecret: (request) => {
+          requestSecret: async (request) => {
             steps.waiting('Waiting for secure input');
-            return this.secretCard(tab, turn, thinking, request);
+            const result = await this.secretCard(tab, turn, thinking, request);
+            keepStepsLast();
+            return result;
           },
         },
         tab.browser,
@@ -1027,6 +1037,12 @@ class StepsBlock {
 
   finish(): void {
     if (this.count) this.renderHead(false);
+    else this.el.hidden = true;
+  }
+
+  /** Back to the running state after a card was answered. */
+  renderRunning(): void {
+    this.renderHead(true, 'Thinking…');
   }
 
   waiting(label: string): void {
