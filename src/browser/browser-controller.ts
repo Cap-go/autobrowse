@@ -391,7 +391,7 @@ export class BrowserTab {
         const size = ${kind === 'tap' ? 44 : 56};
         d.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;border-radius:999px;' +
           'left:' + (${x} - size / 2) + 'px;top:' + (${y} - size / 2) + 'px;width:' + size + 'px;height:' + size + 'px;' +
-          'border:3px solid #34d399;background:rgba(52,211,153,.25);box-shadow:0 0 0 6px rgba(52,211,153,.15);' +
+          'border:3px solid #34d399;background:rgba(52,211,153,.25);' +
           'transition:transform .5s ease,opacity .5s ease;transform:scale(.4);opacity:1';
         document.documentElement.appendChild(d);
         requestAnimationFrame(() => { d.style.transform = 'scale(1.3)'; });

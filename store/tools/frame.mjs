@@ -20,12 +20,12 @@ const sizes = [
 const html = (img, s) => `<!doctype html><html><head><style>
   *{box-sizing:border-box;margin:0}
   html,body{width:440px;height:956px;overflow:hidden;font-family:-apple-system,'SF Pro Display',system-ui,sans-serif;color:#fff;
-    background:radial-gradient(90% 55% at 15% 0%,rgba(62,230,168,.45),transparent 60%),radial-gradient(80% 50% at 100% 100%,rgba(11,143,224,.45),transparent 60%),#07090d}
+    background:#0e8f6e}
   .copy{position:absolute;top:70px;left:0;right:0;text-align:center;padding:0 28px}
-  .k{font-size:13px;font-weight:700;letter-spacing:.18em;color:#3ee6a8}
+  .k{font-size:13px;font-weight:700;letter-spacing:.18em;color:rgba(255,255,255,.75)}
   h1{font-size:38px;line-height:1.08;letter-spacing:-.025em;margin-top:12px;font-weight:800}
   .phone{position:absolute;left:50%;top:250px;transform:translateX(-50%);width:356px;height:772px;border-radius:58px;padding:11px;
-    background:linear-gradient(145deg,#2c313b,#0f1217);box-shadow:0 40px 90px -30px rgba(0,0,0,.9),0 0 0 1.5px rgba(255,255,255,.12) inset}
+    background:#111;box-shadow:0 0 0 1.5px rgba(255,255,255,.12) inset}
   .screen{width:100%;height:100%;border-radius:48px;overflow:hidden;position:relative;background:#0b0d12}
   .screen img{width:100%;display:block}
   .island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:100px;height:30px;border-radius:20px;background:#000;z-index:2}

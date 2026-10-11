@@ -180,9 +180,8 @@ h3 {
 }
 
 .primary {
-  background: linear-gradient(135deg, var(--accent), #2dd4bf);
+  background: var(--accent);
   color: var(--accent-ink);
-  box-shadow: 0 8px 24px -10px rgba(52, 211, 153, 0.7);
 }
 
 .primary:disabled {
@@ -283,8 +282,6 @@ h3 {
   place-items: center;
   margin-bottom: 18px;
   background:
-    radial-gradient(circle at 30% 20%, rgba(52, 211, 153, 0.35), transparent 60%),
-    radial-gradient(circle at 80% 90%, rgba(14, 165, 233, 0.35), transparent 60%),
     var(--panel);
   border: 1px solid var(--border);
   color: var(--accent);
@@ -329,7 +326,6 @@ h3 {
   padding: calc(var(--safe-top) + 24px) 24px calc(var(--safe-bottom) + 20px);
   justify-content: space-between;
   gap: 28px;
-  background: radial-gradient(120% 60% at 50% 0%, rgba(52, 211, 153, 0.14), transparent 70%);
 }
 
 .connect-hero {
@@ -344,7 +340,6 @@ h3 {
   height: 76px;
   border-radius: 20px;
   margin-bottom: 8px;
-  box-shadow: 0 16px 40px -16px rgba(14, 165, 233, 0.8);
 }
 
 .bullets {
@@ -511,7 +506,7 @@ h3 {
 
 .bubble.user {
   align-self: flex-end;
-  background: linear-gradient(135deg, var(--accent), #2dd4bf);
+  background: var(--accent);
   color: var(--accent-ink);
   border-bottom-right-radius: 6px;
 }
@@ -791,7 +786,7 @@ h3 {
   display: grid;
   place-items: center;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: var(--accent);
   color: var(--accent-ink);
   flex: none;
 }
@@ -1070,7 +1065,7 @@ h3 {
   width: 56px;
   height: 56px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #1f2937, #4b5563);
+  background: #374151;
   flex: none;
 }
 
@@ -1082,7 +1077,6 @@ h3 {
   border-radius: 999px;
   border: 3px solid #34d399;
   background: rgba(52, 211, 153, 0.25);
-  box-shadow: 0 0 0 8px rgba(52, 211, 153, 0.15);
 }
 
 /* =========================================================
@@ -1212,19 +1206,27 @@ h3 {
   overflow: hidden;
 }
 
-.screen.browser.loading .progress {
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  background-size: 50% 100%;
-  background-repeat: no-repeat;
+.progress {
+  position: relative;
+}
+
+.screen.browser.loading .progress::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 35%;
+  height: 100%;
+  background: var(--accent);
   animation: loading-bar 1s linear infinite;
 }
 
 @keyframes loading-bar {
   from {
-    background-position: -50% 0;
+    transform: translateX(-100%);
   }
   to {
-    background-position: 150% 0;
+    transform: translateX(290%);
   }
 }
 
@@ -1560,13 +1562,7 @@ h3 {
 .mock-map {
   width: 100%;
   height: 100%;
-  background:
-    radial-gradient(circle at 30% 40%, #ea4335 0 6px, transparent 7px),
-    radial-gradient(circle at 65% 55%, #ea4335 0 6px, transparent 7px),
-    radial-gradient(circle at 45% 70%, #ea4335 0 6px, transparent 7px),
-    linear-gradient(90deg, transparent 48%, #fff 48% 52%, transparent 52%),
-    linear-gradient(0deg, transparent 58%, #fff 58% 61%, transparent 61%),
-    #e8eaed;
+  background: #e8eaed;
 }
 
 /* =========================================================
