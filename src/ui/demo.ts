@@ -26,7 +26,19 @@ export async function runDemo(app: App, name: string): Promise<void> {
   }
   await app.init({ creds: fakeCreds, screen: 'main' });
   if (name === 'settings') {
-    app.openSettings();
+    await app.openSettings();
+    return;
+  }
+  if (name === 'cards') {
+    // Render the real question + secret cards (demo only reaches private methods).
+    const screen = (app as unknown as { screenView: Record<string, (...args: unknown[]) => unknown> }).screenView;
+    const active = (screen as unknown as { active: { log: HTMLElement } }).active;
+    const turn = h('div', { class: 'turn' }, h('div', { class: 'msg user' }, 'Log in to GitHub and star the capacitor repo'));
+    const anchor = h('div');
+    turn.append(anchor);
+    active.log.replaceChildren(turn);
+    void screen.askCard?.call(screen, active, turn, anchor, { question: 'Which account should I use?', options: ['alex@work.com', 'alex@gmail.com'], allowFreeText: true });
+    void screen.secretCard?.call(screen, active, turn, anchor, { name: 'github_password', label: 'GitHub password', reason: 'to sign in', kind: 'password', domain: 'github.com' });
     return;
   }
   if (name === 'link') {

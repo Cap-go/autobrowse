@@ -5,7 +5,36 @@ export type BrowserToolName =
   | 'browser_type'
   | 'browser_scroll'
   | 'browser_read_dom'
-  | 'browser_extract';
+  | 'browser_extract'
+  | 'browser_fill_secret'
+  | 'ask_user'
+  | 'request_secret';
+
+export interface AskUserRequest {
+  question: string;
+  options: string[];
+  allowFreeText: boolean;
+}
+
+/** `answer` is null when the user skipped. */
+export interface AskUserResult {
+  answer: string | null;
+}
+
+export interface SecretRequest {
+  name: string;
+  label: string;
+  reason: string;
+  kind: 'password' | 'otp' | 'card' | 'text';
+  /** Site the secret is for (current page host). */
+  domain: string;
+}
+
+export interface SecretRequestResult {
+  provided: boolean;
+  /** True when a remembered secret was reused without showing a card. */
+  reused?: boolean;
+}
 
 export interface AgentMessage {
   role: 'user' | 'assistant' | 'developer';

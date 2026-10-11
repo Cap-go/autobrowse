@@ -6,7 +6,8 @@ import { APP_LINKS, PREF_KEYS } from '../config';
 import { parseDeepLink } from '../deeplink';
 import { BrowserScreen } from './browser-screen';
 import { h, icon } from './dom';
-import { friendlyError, openExternal, row } from './helpers';
+import { friendlyError, openExternal, row, toast } from './helpers';
+import { vault } from '../secrets/vault';
 
 export type Screen = 'onboarding' | 'connect' | 'main';
 
@@ -42,7 +43,7 @@ export class App {
   private screenView = new BrowserScreen({
     creds: () => this.creds,
     openSignIn: () => this.openSignInSheet(),
-    openSettings: () => this.openSettings(),
+    openSettings: () => void this.openSettings(),
     openSheet: (title, content) => this.openSheet(title, content),
   });
 
@@ -304,7 +305,7 @@ export class App {
     });
   }
 
-  openSettings(): void {
+  async openSettings(): Promise<void> {
     let close: () => void = () => undefined;
     const rows = h('div', { class: 'list' });
 
@@ -335,6 +336,25 @@ export class App {
           close();
           this.go('onboarding');
         }),
+      ),
+    );
+
+    await vault.load();
+    const secrets = vault.list().filter((secret) => secret.remembered);
+    const secretRows = secrets.map((secret) => {
+      const r = row(`${secret.label} · ${secret.domain}`, 'trash', async () => {
+        await vault.remove(secret.name, secret.domain);
+        r.remove();
+        toast(`Deleted ${secret.label}`);
+      });
+      return r;
+    });
+    rows.append(
+      group(
+        'Passwords & secrets',
+        ...(secretRows.length
+          ? secretRows
+          : [h('p', { class: 'row muted-row' }, 'None saved. The agent asks for them in a secure card when a site needs one.')]),
       ),
     );
 

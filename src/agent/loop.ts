@@ -1,7 +1,8 @@
 import type { OAuthCredentialRecord } from '../auth/types';
 import { type BrowserTab, defaultTab } from '../browser/browser-controller';
 import { refreshAccessToken } from '../auth/oauth';
-import { runBrowserTool } from './browser-tools-runner';
+import { runBrowserTool, type UserToolHandlers } from './browser-tools-runner';
+import { vault } from '../secrets/vault';
 import { isAppActive, whenActive } from './lifecycle';
 import { createResponseStream } from './responses-api';
 import type { AgentConversationItem, ToolCallResult, ToolOutput } from './types';
@@ -19,6 +20,9 @@ export interface AgentLoopHooks {
   onToolStart?: (name: string, args: Record<string, unknown>) => void;
   onToolEnd?: (name: string, ok: boolean, summary: string) => void;
   onStepStart?: (step: number) => void;
+  /** Cards for ask_user / request_secret. */
+  askUser?: UserToolHandlers['askUser'];
+  requestSecret?: UserToolHandlers['requestSecret'];
 }
 
 export interface AgentTurnResult {
@@ -46,6 +50,12 @@ async function withFreshToken<T>(
     }
     throw error;
   }
+}
+
+/** Secrets must never reach the model, even if a page echoes them back. */
+function redactOutput(output: ToolOutput): ToolOutput {
+  if (typeof output === 'string') return vault.redact(output);
+  return output.map((part) => (part.type === 'input_text' ? { ...part, text: vault.redact(part.text) } : part));
 }
 
 /** Keep this many most recent tool outputs in full; older ones are trimmed. */
@@ -169,7 +179,12 @@ export async function runAgentTurn(
       let ok = true;
       let summary: string;
       try {
-        output = await runBrowserTool(call.name, call.arguments, tab);
+        output = redactOutput(
+          await runBrowserTool(call.name, call.arguments, tab, {
+            askUser: hooks?.askUser,
+            requestSecret: hooks?.requestSecret,
+          }),
+        );
         summary = typeof output === 'string' ? output.slice(0, 200) : 'Screenshot captured.';
       } catch (error) {
         ok = false;

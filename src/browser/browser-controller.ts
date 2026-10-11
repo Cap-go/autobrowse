@@ -231,6 +231,31 @@ export class BrowserTab {
     });
   }
 
+  /**
+   * Fill a field with a value the model must not see (passwords, codes).
+   * Target by CSS selector or by viewport point. Uses the native value setter
+   * so React/Vue inputs notice the change. Returns what kind of field it was.
+   */
+  async fillValue(value: string, target: { selector?: string; x?: number; y?: number }): Promise<{ filled: boolean; field: string }> {
+    this.requireId();
+    if (target.x !== undefined && target.y !== undefined) await this.showMarker('type', target.x, target.y);
+    const code = `(() => {
+      const sel = ${JSON.stringify(target.selector ?? '')};
+      let el = sel ? document.querySelector(sel) : document.elementFromPoint(${Number(target.x ?? -1)}, ${Number(target.y ?? -1)});
+      if (el && !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
+        el = el.querySelector('input,textarea') || el.closest('label')?.querySelector('input,textarea') || el;
+      }
+      if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) return { filled: false, field: el ? el.tagName.toLowerCase() : 'none' };
+      el.focus();
+      const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, ${JSON.stringify(value)});
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return { filled: true, field: (el.type || el.tagName).toLowerCase() };
+    })()`;
+    return this.runScriptReturning(code);
+  }
+
   async readDom(): Promise<PageRead> {
     return this.runScriptReturning(`(() => {
       const vw = window.innerWidth, vh = window.innerHeight;
@@ -241,7 +266,9 @@ export class BrowserTab {
       for (const el of nodes) {
         const r = el.getBoundingClientRect();
         if (r.width < 4 || r.height < 4 || r.bottom < 0 || r.top > vh || r.right < 0 || r.left > vw) continue;
-        const label = (el.innerText || el.value || el.getAttribute('aria-label') ||
+        // Never expose what is typed in password/sensitive fields.
+        const sensitive = el.type === 'password' || /cc-|one-time-code|current-password|new-password/.test(el.autocomplete || '');
+        const label = (el.innerText || (sensitive ? '' : el.value) || el.getAttribute('aria-label') ||
           el.getAttribute('placeholder') || el.getAttribute('title') || el.getAttribute('name') || '').trim();
         elements.push({
           tag: el.tagName.toLowerCase() + (el.type ? ':' + el.type : ''),

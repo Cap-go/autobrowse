@@ -1,7 +1,7 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { MODELS_API_URL, RESPONSES_API_URL, RESPONSES_MODEL } from '../config';
 import { formatApiError } from './errors';
-import { BROWSER_TOOL_NAMESPACE } from './tools';
+import { BROWSER_TOOL_NAMESPACE, USER_TOOL_NAMESPACE } from './tools';
 import type { AgentConversationItem, ToolCallRequest } from './types';
 
 export interface ResponsesApiOptions {
@@ -27,6 +27,10 @@ const INSTRUCTIONS = [
   '(for searches use https://www.google.com/search?q=...), then call browser_read_dom to read text and',
   'get clickable elements with their x/y centers. Tap using those coordinates. Re-read after each navigation.',
   'Ask the user before payments, purchases, account changes, posting, or sending messages.',
+  'When you need a decision, a confirmation or missing information, call ask_user with short options instead of',
+  'stopping with a question. For passwords, one-time codes, card numbers or any secret: call request_secret, then',
+  'browser_fill_secret. Never ask for secrets in chat, never try to read, guess, repeat or type secret values yourself,',
+  'and never fill a secret on a different site than the one it was requested for.',
   'When done, answer in a few short lines or bullets.',
 ].join(' ');
 
@@ -59,7 +63,7 @@ export async function createResponseStream(
     model,
     input: options.messages,
     instructions: INSTRUCTIONS,
-    tools: [BROWSER_TOOL_NAMESPACE],
+    tools: [BROWSER_TOOL_NAMESPACE, USER_TOOL_NAMESPACE],
     ...(options.noTools ? { tool_choice: 'none' } : {}),
     stream: true,
     store: false,

@@ -1987,3 +1987,190 @@ body {
 .link-card-actions .ghost {
   margin-left: auto;
 }
+
+/* Agent question card */
+.ask-card,
+.secret-card {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 18px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: fade-in 0.2s ease-out;
+}
+
+.ask-question {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.ask-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ask-option {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 999px;
+  padding: 9px 14px;
+  font-size: 15px;
+}
+
+.ask-option:active {
+  background: var(--panel-2);
+}
+
+.ask-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ask-free {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 3px 3px 14px;
+}
+
+.ask-free input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-size: 15px;
+  padding: 7px 0;
+}
+
+.ask-send {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--text);
+  color: var(--bg);
+}
+
+.ask-send .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.ask-skip {
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.answered {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 8px 14px;
+  border-radius: 18px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 14.5px;
+}
+
+.answered .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.answered.secure {
+  align-self: flex-start;
+  background: rgba(52, 211, 153, 0.1);
+  color: var(--text);
+}
+
+.answered.secure .icon {
+  color: var(--accent);
+}
+
+/* Secure secret card (value never enters the chat) */
+.secret-card {
+  border-color: rgba(52, 211, 153, 0.4);
+}
+
+.secret-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+
+.secret-head .icon {
+  color: var(--accent);
+}
+
+.secret-site,
+.secret-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.secret-field {
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0 4px 0 14px;
+}
+
+.secret-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-size: 16px;
+  padding: 12px 0;
+  letter-spacing: 0.04em;
+}
+
+.secret-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.secret-remember input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.secret-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.secret-actions .primary {
+  padding: 11px 18px;
+  font-size: 15px;
+}
+
+.muted-row {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0;
+  cursor: default;
+}

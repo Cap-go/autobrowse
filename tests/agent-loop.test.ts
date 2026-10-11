@@ -21,7 +21,7 @@ const browserPlugin = {
   goBack: mock(async () => {}),
   takeScreenshot: mock(async () => ({ base64: 'c2NyZWVuc2hvdA==' })),
   dispatchInputEvent: mock(async () => {}),
-  executeScript: mock(async () => {}),
+  executeScript: mock(async (_opts?: { code: string }) => {}),
 };
 mock.module('@capgo/capacitor-inappbrowser', () => ({
   InAppBrowser: browserPlugin,
@@ -363,5 +363,66 @@ describe('lifecycle', () => {
     lifecycle.setAppActive(true);
     const result = await run;
     expect(result.assistantText).toContain('Back again.');
+  });
+});
+
+describe('secrets and questions', () => {
+  test('request_secret + browser_fill_secret never send the value to the model', async () => {
+    const { vault } = await import('../src/secrets/vault');
+    const SECRET = 'S3cret-Passw0rd!';
+    const scripts: string[] = [];
+    browserPlugin.executeScript.mockImplementation(async (opts?: { code: string }) => {
+      const code = opts?.code ?? '';
+      scripts.push(code);
+      const channel = code.match(/capgo-dom-[0-9a-f-]+/)?.[0];
+      if (channel) {
+        // Simulate a page that echoes the typed value back in its text.
+        setTimeout(() => listeners.get('messageFromWebview')?.({
+          detail: { channel, payload: { filled: true, field: `password ${SECRET}` } },
+        } as never), 0);
+      }
+    });
+    responses.push(
+      sse([completed([call('nav', 'browser_navigate', { url: 'https://github.com/login' })])]),
+      sse([completed([call('ask', 'request_secret', { name: 'github_password', label: 'GitHub password', kind: 'password' })])]),
+      sse([completed([call('fill', 'browser_fill_secret', { secret: 'secret:github_password', x: 10, y: 20 })])]),
+      sse([completed([message('Signed in.')])]),
+    );
+    const result = await runAgentTurn(creds, createInitialState('Log me in'), {
+      requestSecret: async (req) => {
+        await vault.save({ ...req, value: SECRET, remember: false });
+        return { provided: true };
+      },
+    });
+    browserPlugin.executeScript.mockImplementation(async () => {});
+    expect(result.assistantText).toContain('Signed in.');
+    expect(scripts.some((code) => code.includes(SECRET))).toBe(true);
+    expect(JSON.stringify(requests)).not.toContain(SECRET);
+    expect(JSON.stringify(requests)).toContain('secret:github_password');
+  });
+
+  test('a secret cannot be filled on another site', async () => {
+    const { vault } = await import('../src/secrets/vault');
+    await vault.save({ name: 'bank_pin', label: 'Bank PIN', domain: 'mybank.com', kind: 'password', value: '9876', remember: false });
+    responses.push(
+      sse([completed([call('nav', 'browser_navigate', { url: 'https://evil.example/login' })])]),
+      sse([completed([call('fill', 'browser_fill_secret', { secret: 'bank_pin', x: 1, y: 1 })])]),
+      sse([completed([message('Could not fill.')])]),
+    );
+    await runAgentTurn(creds, createInitialState('fill'));
+    const output = JSON.stringify(requests.at(-1)?.input.at(-1));
+    expect(output).toContain('belongs to mybank.com');
+    expect(JSON.stringify(requests)).not.toContain('9876');
+  });
+
+  test('ask_user returns the chosen answer or a skip', async () => {
+    responses.push(
+      sse([completed([call('q', 'ask_user', { question: 'Which size?', options: ['27"', '32"'] })])]),
+      sse([completed([message('Ok.')])]),
+    );
+    await runAgentTurn(creds, createInitialState('buy'), {
+      askUser: async (req) => ({ answer: req.options[1] ?? null }),
+    });
+    expect(JSON.stringify(requests.at(-1)?.input.at(-1))).toContain('32\\\\\\"');
   });
 });

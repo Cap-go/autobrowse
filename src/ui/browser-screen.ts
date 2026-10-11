@@ -3,6 +3,8 @@ import { appendUserMessage, createInitialState, runAgentTurn, type AgentLoopStat
 import { BrowserTab } from '../browser/browser-controller';
 import { isAppActive, onAppActiveChange } from '../agent/lifecycle';
 import type { DeepLinkAction } from '../deeplink';
+import type { AskUserRequest, AskUserResult, SecretRequest, SecretRequestResult } from '../agent/types';
+import { vault } from '../secrets/vault';
 import { h, icon } from './dom';
 import {
   autoGrow,
@@ -35,6 +37,8 @@ interface Tab {
   log: HTMLElement;
   busy: boolean;
   stopRequested: boolean;
+  /** Resolves a question/secret card that is waiting when the user taps Stop. */
+  cancelPending?: () => void;
   mode: Mode;
   /** Share of the free height given to the page in split mode. */
   pageShare: number;
@@ -215,6 +219,7 @@ export class BrowserScreen {
   async reset(): Promise<void> {
     for (const tab of this.tabs) {
       tab.stopRequested = true;
+      tab.cancelPending?.();
       await tab.browser.close();
     }
     this.tabs = [];
@@ -307,6 +312,7 @@ export class BrowserScreen {
 
   private async closeTab(tab: Tab): Promise<void> {
     tab.stopRequested = true;
+    tab.cancelPending?.();
     await tab.browser.close();
     this.tabs = this.tabs.filter((t) => t !== tab);
     if (!this.tabs.length) this.createTab();
@@ -555,6 +561,7 @@ export class BrowserScreen {
       const tab = this.active;
       if (tab.busy) {
         tab.stopRequested = true;
+        tab.cancelPending?.();
         this.send.disabled = true;
         return;
       }
@@ -688,6 +695,14 @@ export class BrowserScreen {
             scrollToEnd(log);
           },
           onToolEnd: (_name, ok) => steps.end(ok),
+          askUser: (request) => {
+            steps.waiting('Waiting for your answer');
+            return this.askCard(tab, turn, thinking, request);
+          },
+          requestSecret: (request) => {
+            steps.waiting('Waiting for secure input');
+            return this.secretCard(tab, turn, thinking, request);
+          },
         },
         tab.browser,
       );
@@ -710,6 +725,129 @@ export class BrowserScreen {
     }
   }
 
+  // ---------- question & secret cards ----------
+
+  /** Question from the agent: suggested answers, own answer, or skip. */
+  private askCard(tab: Tab, turn: HTMLElement, before: HTMLElement, req: AskUserRequest): Promise<AskUserResult> {
+    return new Promise((resolve) => {
+      const card = h('div', { class: 'ask-card', role: 'group', 'aria-label': 'Question from the agent' });
+      const done = (answer: string | null): void => {
+        tab.cancelPending = undefined;
+        card.replaceWith(
+          h('div', { class: 'answered' }, icon(answer === null ? 'close' : 'check'), h('span', {}, answer === null ? 'Skipped' : answer)),
+        );
+        resolve({ answer });
+        if (tab === this.active) this.syncComposer();
+      };
+      tab.cancelPending = () => done(null);
+
+      card.append(h('p', { class: 'ask-question' }, req.question));
+      if (req.options.length) {
+        card.append(
+          h(
+            'div',
+            { class: 'ask-options' },
+            ...req.options.map((option) => h('button', { class: 'ask-option', type: 'button', onclick: () => done(option) }, option)),
+          ),
+        );
+      }
+      const footer = h('div', { class: 'ask-footer' });
+      if (req.allowFreeText) {
+        const field = h('input', { type: 'text', placeholder: req.options.length ? 'Or type your answer' : 'Type your answer', enterkeyhint: 'send', 'aria-label': 'Your answer' });
+        const send = h('button', { class: 'ask-send', type: 'submit', 'aria-label': 'Send answer' }, icon('send'));
+        const form = h('form', { class: 'ask-free' }, field, send);
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const value = field.value.trim();
+          if (value) done(value);
+        });
+        footer.append(form);
+      }
+      footer.append(h('button', { class: 'ghost ask-skip', type: 'button', onclick: () => done(null) }, 'Skip'));
+      card.append(footer);
+      turn.insertBefore(card, before.isConnected ? before : null);
+      scrollToEnd(tab.log);
+    });
+  }
+
+  /**
+   * Secure input for passwords/codes. The value goes straight to the vault
+   * (memory, Keychain if remembered) and never into the chat or the model.
+   */
+  private async secretCard(tab: Tab, turn: HTMLElement, before: HTMLElement, req: SecretRequest): Promise<SecretRequestResult> {
+    await vault.load();
+    const saved = vault.find(req.name, req.domain);
+    if (saved) {
+      turn.insertBefore(
+        h('div', { class: 'answered secure' }, icon('lock'), h('span', {}, `Used your saved ${saved.label} for ${saved.domain}`)),
+        before.isConnected ? before : null,
+      );
+      return { provided: true, reused: true };
+    }
+
+    return new Promise((resolve) => {
+      const autocomplete = { password: 'current-password', otp: 'one-time-code', card: 'cc-number', text: 'off' }[req.kind];
+      const field = h('input', {
+        type: 'password',
+        autocomplete,
+        inputmode: req.kind === 'otp' || req.kind === 'card' ? 'numeric' : undefined,
+        autocapitalize: 'off',
+        autocorrect: 'off',
+        spellcheck: 'false',
+        'aria-label': req.label,
+        placeholder: req.label,
+      });
+      const reveal = h('button', { class: 'icon-btn reveal', type: 'button', 'aria-label': 'Show' }, icon('eye'));
+      reveal.addEventListener('click', () => {
+        field.type = field.type === 'password' ? 'text' : 'password';
+        reveal.replaceChildren(icon(field.type === 'password' ? 'eye' : 'eyeOff'));
+      });
+      const remember = h('input', { type: 'checkbox', checked: req.kind === 'password' });
+      const save = h('button', { class: 'primary', type: 'submit', disabled: true }, 'Use securely');
+      const cancel = h('button', { class: 'ghost', type: 'button' }, 'Cancel');
+      field.addEventListener('input', () => {
+        save.disabled = !field.value;
+      });
+
+      const card = h(
+        'form',
+        { class: 'secret-card', autocomplete: 'on' },
+        h('div', { class: 'secret-head' }, icon('lock'), h('strong', {}, req.label)),
+        h('p', { class: 'secret-site' }, `For ${req.domain}${req.reason ? ` · ${req.reason}` : ''}`),
+        h('div', { class: 'secret-field' }, field, reveal),
+        req.kind === 'otp'
+          ? null
+          : h('label', { class: 'secret-remember' }, remember, h('span', {}, 'Remember on this device (Keychain)')),
+        h('p', { class: 'secret-note' }, 'Hidden from the AI and never added to the chat. Only the app fills it on this site.'),
+        h('div', { class: 'secret-actions' }, save, cancel),
+      );
+
+      const finish = (provided: boolean): void => {
+        tab.cancelPending = undefined;
+        field.value = '';
+        card.replaceWith(
+          h('div', { class: 'answered secure' }, icon(provided ? 'lock' : 'close'), h('span', {}, provided ? `${req.label} saved securely · hidden from the AI` : `${req.label} not provided`)),
+        );
+        resolve({ provided });
+        if (tab === this.active) this.syncComposer();
+      };
+      tab.cancelPending = () => finish(false);
+      cancel.addEventListener('click', () => finish(false));
+      card.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const value = field.value;
+        if (!value) return;
+        save.disabled = true;
+        await vault.save({ name: req.name, label: req.label, domain: req.domain, kind: req.kind, value, remember: remember.checked && req.kind !== 'otp' });
+        finish(true);
+      });
+
+      turn.insertBefore(card, before.isConnected ? before : null);
+      scrollToEnd(tab.log);
+      if (tab === this.active) requestAnimationFrame(() => field.focus());
+    });
+  }
+
   // ---------- overlays ----------
 
   private openMenu(): void {
@@ -725,6 +863,7 @@ export class BrowserScreen {
       row('New chat in this tab', 'chat', () => {
         close();
         tab.stopRequested = true;
+        tab.cancelPending?.();
         tab.agentState = null;
         tab.log.replaceChildren(this.renderWelcome());
       }),
@@ -848,6 +987,11 @@ class StepsBlock {
 
   finish(): void {
     if (this.count) this.renderHead(false);
+  }
+
+  waiting(label: string): void {
+    this.el.hidden = false;
+    this.head.replaceChildren(icon('hand'), h('span', { class: 'steps-title' }, label), icon('chevron', 'icon steps-chevron'));
   }
 
   private renderHead(running: boolean, current?: string): void {
