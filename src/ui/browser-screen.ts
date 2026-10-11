@@ -1,6 +1,7 @@
 import type { OAuthCredentialRecord } from '../auth/types';
 import { appendUserMessage, createInitialState, runAgentTurn, type AgentLoopState } from '../agent/loop';
-import { BrowserTab } from '../browser/browser-controller';
+import { AppLauncher } from '@capacitor/app-launcher';
+import { BrowserTab, onExternalLink } from '../browser/browser-controller';
 import { isAppActive, onAppActiveChange } from '../agent/lifecycle';
 import type { DeepLinkAction } from '../deeplink';
 import type { AskUserRequest, AskUserResult, SecretRequest, SecretRequestResult } from '../agent/types';
@@ -94,6 +95,40 @@ export class BrowserScreen {
 
   constructor(private host: BrowserScreenHost) {
     this.active = this.createTab();
+    onExternalLink((tab, url) => this.confirmExternal(tab, url));
+  }
+
+  private externalPrompt = false;
+
+  /** A page wants to open another app (mailto:, tel:, youtube://…): ask first. */
+  private confirmExternal(tab: BrowserTab, url: string): void {
+    const owner = this.tabs.find((t) => t.browser === tab);
+    // Only the visible tab may prompt; background tabs and agents never leave the app.
+    if (!owner || owner !== this.active || this.externalPrompt || this.overlayOpen) return;
+    this.externalPrompt = true;
+    const target = describeExternal(url);
+    const site = tab.url ? prettyUrl(tab.url).split('/')[0] : 'This page';
+    let close: () => void = () => undefined;
+    const open = h('button', { class: 'primary block', type: 'button' }, `Open ${target.app}`);
+    const stay = h('button', { class: 'secondary block', type: 'button' }, 'Stay in Auto Browse');
+    open.addEventListener('click', () => {
+      close();
+      void AppLauncher.openUrl({ url }).catch(() => toast(`Could not open ${target.app}.`));
+    });
+    stay.addEventListener('click', () => close());
+    const body = h(
+      'div',
+      { class: 'sheet-body' },
+      h('p', { class: 'lede' }, `${site} wants to open ${target.app}${target.detail ? `: ${target.detail}` : ''}.`),
+      h('p', { class: 'fine external-url' }, url.length > 120 ? `${url.slice(0, 117)}…` : url),
+      open,
+      stay,
+    );
+    const closeSheet = this.host.openSheet('Leave Auto Browse?', body);
+    close = () => {
+      this.externalPrompt = false;
+      closeSheet();
+    };
   }
 
   // ---------- public API ----------
@@ -1000,5 +1035,32 @@ class StepsBlock {
       h('span', { class: 'steps-title' }, running ? (current ?? 'Browsing…') : `Browsed · ${this.count} ${this.count === 1 ? 'step' : 'steps'}`),
       icon('chevron', 'icon steps-chevron'),
     );
+  }
+}
+
+/** Friendly name for an app link scheme. */
+function describeExternal(url: string): { app: string; detail?: string } {
+  const scheme = (url.match(/^([a-z][a-z0-9+.-]*):/i)?.[1] ?? '').toLowerCase();
+  const rest = decodeURIComponent(url.slice(scheme.length + 1).replace(/^\/\//, '')).split('?')[0] ?? '';
+  switch (scheme) {
+    case 'mailto':
+      return { app: 'Mail', detail: rest };
+    case 'tel':
+    case 'telprompt':
+      return { app: 'Phone', detail: rest };
+    case 'sms':
+      return { app: 'Messages', detail: rest };
+    case 'facetime':
+    case 'facetime-audio':
+      return { app: 'FaceTime', detail: rest };
+    case 'maps':
+      return { app: 'Maps' };
+    case 'itms-apps':
+    case 'itms-appss':
+      return { app: 'the App Store' };
+    default: {
+      const name = scheme.replace(/[-_.]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      return { app: name ? `the ${name} app` : 'another app' };
+    }
   }
 }

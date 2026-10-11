@@ -40,7 +40,55 @@ function roundFrame(f: BrowserFrame): BrowserFrame {
   return { x: Math.round(f.x), y: Math.round(f.y), width: Math.round(f.width), height: Math.round(f.height) };
 }
 
+/** Channel used by the in-page link guard to report app links. */
+const EXTERNAL_LINK_CHANNEL = 'capgo-external-link';
+
+/**
+ * Runs at document start in every page and frame. Taps on links (or
+ * window.open calls) with a non-web scheme such as mailto:, tel:, youtube://
+ * are stopped and reported to the app, which asks before leaving. HTTPS links
+ * stay in the browser because preventDeeplink is on.
+ */
+const LINK_GUARD_SCRIPT = `(() => {
+  if (window.__autoBrowseLinkGuard) return;
+  window.__autoBrowseLinkGuard = true;
+  const WEB = ['http', 'https', 'about', 'javascript', 'data', 'blob'];
+  const external = (href) => {
+    const m = /^([a-z][a-z0-9+.-]*):/i.exec(String(href || ''));
+    return m && WEB.indexOf(m[1].toLowerCase()) < 0;
+  };
+  const report = (url) => {
+    try { window.mobileApp.postMessage({ detail: { channel: '${EXTERNAL_LINK_CHANNEL}', url: String(url) } }); } catch (e) {}
+  };
+  document.addEventListener('click', (e) => {
+    const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a || !external(a.href || a.getAttribute('href'))) return;
+    e.preventDefault();
+    e.stopPropagation();
+    report(a.href || a.getAttribute('href'));
+  }, true);
+  const open = window.open;
+  window.open = function (url) {
+    if (external(url)) { report(url); return null; }
+    return open.apply(this, arguments);
+  };
+})();`;
+
+type ExternalLinkHandler = (tab: BrowserTab, url: string) => void;
+let externalLinkHandler: ExternalLinkHandler | null = null;
+
+/** Called when a page wants to open another app. The UI decides (asks the user). */
+export function onExternalLink(handler: ExternalLinkHandler): void {
+  externalLinkHandler = handler;
+}
+
 async function registerBrowserListeners(): Promise<void> {
+  await InAppBrowser.addListener('messageFromWebview', (event) => {
+    const detail = event.detail as { channel?: string; url?: string } | undefined;
+    if (detail?.channel !== EXTERNAL_LINK_CHANNEL || !detail.url) return;
+    const tab = event.id ? tabsByWebView.get(event.id) : undefined;
+    if (tab) externalLinkHandler?.(tab, detail.url);
+  });
   await InAppBrowser.addListener('urlChangeEvent', (event) => {
     const tab = event.id ? tabsByWebView.get(event.id) : undefined;
     tab?.handleUrl(event.url);
@@ -160,6 +208,10 @@ export class BrowserTab {
             enabledSafeTopMargin: true,
           }),
       ...(this.visible ? {} : { hidden: true }),
+      // Links never jump to other apps on their own; app schemes are asked first.
+      preventDeeplink: true,
+      preShowScript: LINK_GUARD_SCRIPT,
+      preShowScriptInjectionTime: 'documentStart',
     });
     this.webViewId = result.id;
     tabsByWebView.set(result.id, this);
