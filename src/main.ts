@@ -1,5 +1,7 @@
 import { App } from './ui/app';
 import { App as CapApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import { setAppActive } from './agent/lifecycle';
 import { trackKeyboard } from './ui/keyboard';
 
@@ -8,6 +10,8 @@ if (!root) {
   throw new Error('Missing #app root');
 }
 
+// Tell Capgo this bundle booted fine (otherwise it rolls back automatically).
+if (Capacitor.isNativePlatform()) void CapacitorUpdater.notifyAppReady().catch(() => undefined);
 trackKeyboard();
 void CapApp.addListener('appStateChange', ({ isActive }) => setAppActive(isActive));
 const app = new App(root);

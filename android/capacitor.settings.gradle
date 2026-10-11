@@ -23,6 +23,9 @@ project(':capgo-capacitor-inappbrowser').projectDir = new File('../node_modules/
 include ':capgo-capacitor-speech-recognition'
 project(':capgo-capacitor-speech-recognition').projectDir = new File('../node_modules/@capgo/capacitor-speech-recognition/android')
 
+include ':capgo-capacitor-updater'
+project(':capgo-capacitor-updater').projectDir = new File('../node_modules/@capgo/capacitor-updater/android')
+
 include ':capgo-native-navigation'
 project(':capgo-native-navigation').projectDir = new File('../node_modules/@capgo/native-navigation/android')
 

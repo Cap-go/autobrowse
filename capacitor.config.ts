@@ -15,6 +15,13 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SecureStoragePlugin: {},
+    // Capgo live updates: web-layer fixes ship without App Store review.
+    // Delta uploads (only changed files) keep downloads tiny.
+    CapacitorUpdater: {
+      autoUpdate: true,
+      // A bad bundle that never calls notifyAppReady() is rolled back.
+      appReadyTimeout: 10000,
+    },
     Keyboard: {
       // The layout shrinks itself by the keyboard height (see src/ui/keyboard.ts)
       // so the native page frame can follow.

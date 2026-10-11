@@ -8,6 +8,8 @@ import { BrowserScreen } from './browser-screen';
 import { h, icon } from './dom';
 import { friendlyError, openExternal, row, toast } from './helpers';
 import { vault } from '../secrets/vault';
+import { Capacitor } from '@capacitor/core';
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
 
 export type Screen = 'onboarding' | 'connect' | 'main';
 
@@ -393,6 +395,23 @@ export class App {
       );
     }
 
+    const bundle = await currentBundle();
+    const capgo = h(
+      'button',
+      { class: 'capgo-card', type: 'button', 'aria-label': 'Live updates by Capgo, open capgo.app' },
+      icon('capgo', 'capgo-logo'),
+      h(
+        'div',
+        {},
+        h('strong', {}, 'Live updates by Capgo'),
+        h('span', {}, 'Fixes and new features arrive instantly, without waiting for the App Store.'),
+        h('span', { class: 'capgo-version' }, bundle),
+      ),
+      icon('external'),
+    );
+    capgo.addEventListener('click', () => void openExternal(APP_LINKS.capgo));
+    rows.append(capgo);
+
     rows.append(h('p', { class: 'fine center' }, `Auto Browse ${APP_VERSION} · Not affiliated with OpenAI`));
     close = this.openSheet('Settings', h('div', { class: 'sheet-body' }, rows));
   }
@@ -434,3 +453,15 @@ function link(label: string, url: string): HTMLElement {
   );
 }
 
+
+/** "App 1.0.0 · Live bundle 1.0.3" (or builtin) for the Capgo card. */
+async function currentBundle(): Promise<string> {
+  if (!Capacitor.isNativePlatform()) return `Version ${APP_VERSION}`;
+  try {
+    const info = await CapacitorUpdater.current();
+    const live = info.bundle.id === 'builtin' ? 'built-in bundle' : `live bundle ${info.bundle.version}`;
+    return `App ${info.native} · ${live}`;
+  } catch {
+    return `Version ${APP_VERSION}`;
+  }
+}

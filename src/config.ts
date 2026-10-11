@@ -38,6 +38,7 @@ export const APP_LINKS = {
   terms: 'https://capgo.app/tos/',
   support: 'https://capgo.app/contact/',
   openaiUsage: 'https://openai.com/policies/usage-policies/',
+  capgo: 'https://capgo.app/?utm_source=autobrowse&utm_medium=app&utm_campaign=settings',
 } as const;
 
 /** Non-secret UI preferences (localStorage is fine here; never store tokens). */

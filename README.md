@@ -86,3 +86,16 @@ Regenerate native icons and splash from `assets/`:
 ```bash
 bunx @capacitor/assets generate --ios --android --iconBackgroundColor '#14c7c0' --splashBackgroundColor '#0b0d12'
 ```
+
+## Live updates (Capgo)
+
+Web-layer changes (everything in `src/`) ship instantly with [Capgo](https://capgo.app)
+live updates, no App Store review. Delta updates send only changed files.
+
+1. Bump `version` in `package.json` (patch for fixes, e.g. `1.0.1`).
+2. `bun run release:live` (build + `@capgo/cli bundle upload --channel production --delta`).
+
+Devices download in the background and switch on next launch. A bundle that does not
+call `CapacitorUpdater.notifyAppReady()` within 10 s rolls back automatically.
+Native changes (new plugins, `Info.plist`, entitlements) still need a store build.
+Dashboard: https://console.capgo.app/app/app.capgo.browser

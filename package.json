@@ -1,7 +1,7 @@
 {
   "name": "capgo-browser",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" \"plugins/**/*.ts\"",
     "test": "bun test",
-    "cap:sync": "cap sync"
+    "cap:sync": "cap sync",
+    "release:live": "bun run build && bunx @capgo/cli@latest bundle upload app.capgo.browser --channel production --delta"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
@@ -22,6 +23,7 @@
     "@capacitor/share": "^8",
     "@capgo/capacitor-inappbrowser": "^8.22.2",
     "@capgo/capacitor-speech-recognition": "^8.4.1",
+    "@capgo/capacitor-updater": "^8.52.1",
     "@capgo/native-navigation": "^8.0.8",
     "@capgo/oauth-loopback": "file:./plugins/oauth-loopback",
     "capacitor-secure-storage-plugin": "^0.13.0"
