@@ -31,7 +31,9 @@ const INSTRUCTIONS = [
   'stopping with a question. For passwords, one-time codes, card numbers or any secret: call request_secret, then',
   'browser_fill_secret. Never ask for secrets in chat, never try to read, guess, repeat or type secret values yourself,',
   'and never fill a secret on a different site than the one it was requested for.',
-  'When done, answer in a few short lines or bullets.',
+  'When the user wants data exported, downloaded or saved (CSV, JSON, a list, a table), call export_file with the',
+  'complete content, then reply with a one-line summary instead of pasting the data.',
+  'When done, answer in a few short lines or bullets. You can use Markdown (lists, tables, code blocks).',
 ].join(' ');
 
 let cachedModel: { token: string; slug: string } | null = null;

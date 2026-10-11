@@ -23,6 +23,7 @@ export interface AgentLoopHooks {
   /** Cards for ask_user / request_secret. */
   askUser?: UserToolHandlers['askUser'];
   requestSecret?: UserToolHandlers['requestSecret'];
+  exportFile?: UserToolHandlers['exportFile'];
 }
 
 export interface AgentTurnResult {
@@ -183,6 +184,7 @@ export async function runAgentTurn(
           await runBrowserTool(call.name, call.arguments, tab, {
             askUser: hooks?.askUser,
             requestSecret: hooks?.requestSecret,
+            exportFile: hooks?.exportFile,
           }),
         );
         summary = typeof output === 'string' ? output.slice(0, 200) : 'Screenshot captured.';

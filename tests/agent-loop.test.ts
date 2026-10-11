@@ -426,3 +426,20 @@ describe('secrets and questions', () => {
     expect(JSON.stringify(requests.at(-1)?.input.at(-1))).toContain('32\\\\\\"');
   });
 });
+
+describe('export_file', () => {
+  test('hands the file to the UI and redacts secrets inside it', async () => {
+    const { vault } = await import('../src/secrets/vault');
+    await vault.save({ name: 'api_key', label: 'API key', domain: 'example.com', kind: 'text', value: 'sk-SECRET-123', remember: false });
+    const files: Array<{ filename: string; content: string }> = [];
+    responses.push(
+      sse([completed([call('f', 'export_file', { filename: 'products.csv', content: 'name,price\nShoe,275\nkey,sk-SECRET-123' })])]),
+      sse([completed([message('Exported 2 products.')])]),
+    );
+    await runAgentTurn(creds, createInitialState('export'), { exportFile: (file) => files.push(file) });
+    expect(files[0]?.filename).toBe('products.csv');
+    expect(files[0]?.content).toContain('Shoe,275');
+    expect(files[0]?.content).not.toContain('sk-SECRET-123');
+    expect(JSON.stringify(requests.at(-1)?.input.at(-1))).toContain('"ok\\":true');
+  });
+});

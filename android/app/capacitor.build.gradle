@@ -11,7 +11,9 @@ apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
 dependencies {
     implementation project(':capacitor-app')
     implementation project(':capacitor-app-launcher')
+    implementation project(':capacitor-filesystem')
     implementation project(':capacitor-keyboard')
+    implementation project(':capacitor-share')
     implementation project(':capgo-capacitor-inappbrowser')
     implementation project(':capgo-capacitor-speech-recognition')
     implementation project(':capgo-native-navigation')

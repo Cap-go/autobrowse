@@ -161,11 +161,28 @@ export const USER_TOOLS: FunctionToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  {
+    type: 'function',
+    name: 'export_file',
+    description:
+      'Give the user a downloadable file (CSV, JSON, TSV, Markdown, TXT). Use it whenever the user asks to export, ' +
+      'download or save data. The app shows a file card with a preview and Save/Share. Prefer this over pasting ' +
+      'long data in the reply; then just summarize what the file contains.',
+    parameters: {
+      type: 'object',
+      properties: {
+        filename: { type: 'string', description: 'e.g. "tory-burch-shoes.csv"' },
+        content: { type: 'string', description: 'Full file content. CSV must have a header row; quote fields with commas.' },
+      },
+      required: ['filename', 'content'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 export const USER_TOOL_NAMESPACE = {
   type: 'namespace',
   name: 'capgo_user',
-  description: 'Talk to the user: ask questions and request secrets securely.',
+  description: 'Talk to the user: ask questions, request secrets securely and hand over files.',
   tools: USER_TOOLS,
 } as const;

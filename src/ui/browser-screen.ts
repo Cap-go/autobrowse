@@ -19,6 +19,7 @@ import {
   toUrl,
 } from './helpers';
 import { renderMarkdown } from './markdown';
+import { fileCard } from './export';
 import { VoiceInput } from './voice';
 
 export interface BrowserScreenHost {
@@ -733,6 +734,10 @@ export class BrowserScreen {
           askUser: (request) => {
             steps.waiting('Waiting for your answer');
             return this.askCard(tab, turn, thinking, request);
+          },
+          exportFile: (file) => {
+            turn.insertBefore(fileCard(file.filename, file.content), thinking.isConnected ? thinking : answer);
+            scrollToEnd(log);
           },
           requestSecret: (request) => {
             steps.waiting('Waiting for secure input');

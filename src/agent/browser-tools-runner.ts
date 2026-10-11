@@ -1,12 +1,15 @@
 import { type BrowserTab, defaultTab } from '../browser/browser-controller';
 import { normalizeSecretName, siteOf, vault } from '../secrets/vault';
-import type { AskUserRequest, AskUserResult, BrowserToolName, SecretRequest, SecretRequestResult, ToolOutput } from './types';
+import type { ExportFileRequest, AskUserRequest, AskUserResult, BrowserToolName, SecretRequest, SecretRequestResult, ToolOutput } from './types';
 
 /** UI callbacks for tools that need the user (cards in the chat). */
 export interface UserToolHandlers {
   askUser?: (request: AskUserRequest) => Promise<AskUserResult>;
   requestSecret?: (request: SecretRequest) => Promise<SecretRequestResult>;
+  exportFile?: (request: ExportFileRequest) => void;
 }
+
+const MAX_EXPORT_BYTES = 2_000_000;
 
 export async function runBrowserTool(
   name: BrowserToolName,
@@ -44,6 +47,17 @@ export async function runBrowserTool(
               note: 'Use browser_fill_secret with this reference. The value is never shown to you.' }
           : { ok: false, declined: true },
       );
+    }
+    case 'export_file': {
+      if (!handlers.exportFile) throw new Error('Files are not available here.');
+      const content = String(args.content ?? '');
+      if (!content) throw new Error('The file is empty.');
+      if (content.length > MAX_EXPORT_BYTES) throw new Error('File too large (max 2 MB).');
+      // Never let a secret end up in an exported file.
+      const safe = vault.redact(content);
+      const filename = String(args.filename ?? 'export.txt');
+      handlers.exportFile({ filename, content: safe });
+      return JSON.stringify({ ok: true, filename, bytes: safe.length, note: 'Shown to the user with Save/Share.' });
     }
     case 'browser_fill_secret': {
       const ref = String(args.secret ?? '');

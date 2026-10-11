@@ -29,6 +29,20 @@ export async function runDemo(app: App, name: string): Promise<void> {
     await app.openSettings();
     return;
   }
+  if (name === 'export') {
+    const { fileCard } = await import('./export');
+    const log = document.querySelector('.chat-host .chat-log');
+    document.querySelector('.screen.browser')?.classList.add('mode-chat');
+    const answer = h('div', { class: 'msg assistant' });
+    answer.append(renderMarkdown('Exported the first 10 products to **tory-burch-shoes.csv**.\n\n| Product | Price |\n|---|---|\n| Mellow Mules | $275 |\n| Claire Flats | $228 |\n\n```csv\nname,price\nMellow Mules,275\n```'));
+    log?.replaceChildren(
+      h('div', { class: 'turn' },
+        h('div', { class: 'msg user' }, 'Export me the 10 first products of this page in csv'),
+        fileCard('tory-burch-shoes.csv', 'name,price,rating\n"Women\'s Mellow Mules",275,4.5\nClaire Ballet Flats,228,4.6\nEleanor Loafers,298,4.4\nMiller Sandals,198,4.3\nGood Luck Trainers,248,4.2'),
+        answer),
+    );
+    return;
+  }
   if (name === 'cards') {
     // Render the real question + secret cards (demo only reaches private methods).
     const screen = (app as unknown as { screenView: Record<string, (...args: unknown[]) => unknown> }).screenView;

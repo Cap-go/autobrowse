@@ -8,7 +8,13 @@ export type BrowserToolName =
   | 'browser_extract'
   | 'browser_fill_secret'
   | 'ask_user'
-  | 'request_secret';
+  | 'request_secret'
+  | 'export_file';
+
+export interface ExportFileRequest {
+  filename: string;
+  content: string;
+}
 
 export interface AskUserRequest {
   question: string;
