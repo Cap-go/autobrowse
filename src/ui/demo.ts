@@ -2,6 +2,7 @@
 import type { OAuthCredentialRecord } from '../auth/types';
 import type { App } from './app';
 import { h, icon } from './dom';
+import { renderMarkdown } from './markdown';
 
 const fakeCreds = {
   email: 'alex@example.com',
@@ -69,24 +70,26 @@ export async function runDemo(app: App, name: string): Promise<void> {
             user: 'Open Hacker News and summarize the top 3 stories.',
             tools: ['Opening news.ycombinator.com', 'Reading the page'],
             answer:
-              'Top 3 on Hacker News right now:\n\n1. A new open source browser engine in Rust hits 1.0.\n2. Why SQLite is quietly running your phone.\n3. Show HN: a tiny CSS framework with zero classes.',
+              'Top 3 on Hacker News right now:\n\n1. **Rust browser engine hits 1.0** — a new open source engine, already passing most web tests.\n2. **Why SQLite runs your phone** — a look at the database inside every app.\n3. **Show HN: zero-class CSS** — style plain HTML with no class names.',
           }
         : {
             url: 'google.com/search',
             user: 'Find the best price for a 27 inch 4K monitor and list the top 3 stores.',
             tools: ['Opening google.com', 'Typing “27 inch 4K monitor”', 'Reading the page'],
-            answer: '• Tech Depot — $279, free delivery\n• MegaMart — $289, pickup today\n• PixelShop — $299\n\nTech Depot is the cheapest.',
+            answer: 'Best prices for a 27" 4K monitor:\n\n- **Tech Depot** — $279, free delivery\n- **MegaMart** — $289, pickup today\n- **PixelShop** — $299\n\nTech Depot is the cheapest. Want me to open it?',
           };
     section.classList.add('has-page');
     address.value = script.url;
     page.replaceChildren(name === 'chat' ? mockNews() : mockShopping());
     page.classList.add('demo-page');
-    log.append(h('div', { class: 'bubble user' }, script.user));
-    const activity = h('div', { class: 'activity' });
-    for (const label of script.tools) {
-      activity.append(h('div', { class: 'tool-chip done' }, h('span', { class: 'spinner' }), icon('check', 'icon ok'), h('span', {}, label)));
-    }
-    log.append(activity, h('div', { class: 'bubble assistant' }, script.answer));
+    const steps = h(
+      'div',
+      { class: 'steps' },
+      h('button', { class: 'steps-head', type: 'button' }, icon('globe'), h('span', { class: 'steps-title' }, `Browsed · ${script.tools.length} steps`), icon('chevron', 'icon steps-chevron')),
+    );
+    const answer = h('div', { class: 'msg assistant' });
+    answer.append(renderMarkdown(script.answer));
+    log.append(h('div', { class: 'turn' }, h('div', { class: 'msg user' }, script.user), steps, answer));
     const input = document.querySelector('textarea');
     if (input) input.placeholder = 'Ask about this page or say what to do…';
     const status = document.querySelector('.agent-status');

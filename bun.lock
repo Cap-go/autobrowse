@@ -9,6 +9,7 @@
         "@capacitor/app": "^8.0.0",
         "@capacitor/core": "^8.5.3",
         "@capacitor/ios": "^8.5.3",
+        "@capacitor/keyboard": "^8",
         "@capgo/capacitor-inappbrowser": "^8.22.2",
         "@capgo/capacitor-speech-recognition": "^8.4.1",
         "@capgo/native-navigation": "^8.0.8",
@@ -37,6 +38,8 @@
     "@capacitor/core": ["@capacitor/core@8.5.3", "", { "dependencies": { "tslib": "^2.1.0" } }, "sha512-oBE1oGuYE4ZzYYrulC75OuHdSsD6zLUy7d5o1tFwDLG4govGoubY15cxpiI5l0+q87Lm5p0bhbehMdzJg4aFag=="],
 
     "@capacitor/ios": ["@capacitor/ios@8.5.3", "", { "peerDependencies": { "@capacitor/core": "^8.5.0" } }, "sha512-HnnV92Jl8+3x0JUloXUMjFcUsQI8wHFVsKwkLn72DfRZXYGZW11tQbmNOWOnRTljaU18FdI1b9ipT09SzzPDNw=="],
+
+    "@capacitor/keyboard": ["@capacitor/keyboard@8.0.6", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-Bbe+9V0qaT6dzEFJEK7BUWR01l2+vZE8FM5ITF/WgKtx+G6eGZ6d5+YiSMRJBAK0VGjdO59v8yiQ10Doa5KyvQ=="],
 
     "@capgo/capacitor-inappbrowser": ["@capgo/capacitor-inappbrowser@8.22.2", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-vHkbjkAHYq/WwK2Lmx08MsgmW1Fv++CWf/SVMU4K3v9JjE9v7Re9ajoIc+8NkBNhWBjcM414Zp22Vmmw/A5ShQ=="],
 

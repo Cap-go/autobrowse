@@ -24,6 +24,19 @@ export const TOOL_LABELS: Record<string, string> = {
   browser_extract: 'Extracting details',
 };
 
+export function toolLabel(name: string, args?: Record<string, unknown>): string {
+  let label = TOOL_LABELS[name] ?? name;
+  if (name === 'browser_navigate' && typeof args?.url === 'string') {
+    try {
+      label = `${label} ${new URL(args.url).hostname.replace(/^www\./, '')}`;
+    } catch {
+      /* keep label */
+    }
+  }
+  if (name === 'browser_type' && typeof args?.text === 'string') label = `${label} “${args.text.slice(0, 40)}”`;
+  return label;
+}
+
 export function toolChip(name: string, args?: Record<string, unknown>): HTMLElement {
   let label = TOOL_LABELS[name] ?? name;
   if (name === 'browser_navigate' && typeof args?.url === 'string') {

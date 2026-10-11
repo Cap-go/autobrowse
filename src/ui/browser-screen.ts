@@ -4,16 +4,16 @@ import { BrowserTab } from '../browser/browser-controller';
 import { h, icon } from './dom';
 import {
   autoGrow,
-  bubble,
   firstName,
   friendlyError,
   prettyUrl,
   row,
   scrollToEnd,
   toast,
-  toolChip,
+  toolLabel,
   toUrl,
 } from './helpers';
+import { renderMarkdown } from './markdown';
 import { VoiceInput } from './voice';
 
 export interface BrowserScreenHost {
@@ -150,6 +150,8 @@ export class BrowserScreen {
 
     // Chat
     this.chatHost = h('div', { class: 'chat-host' });
+    // Like ChatGPT: scrolling the conversation closes the keyboard.
+    this.chatHost.addEventListener('touchmove', () => this.input.blur(), { passive: true });
     this.showPagePill = h('button', { class: 'pill', type: 'button' }, icon('globe'), h('span', {}, 'Show page'));
     this.showPagePill.addEventListener('click', () => this.setMode(this.active, 'split'));
     this.showChatPill = h('button', { class: 'pill', type: 'button' }, icon('chat'), h('span', {}, 'Show chat'));
@@ -445,20 +447,21 @@ export class BrowserScreen {
     return h(
       'div',
       { class: 'welcome' },
+      h('h2', {}, creds ? 'What should I do?' : 'Browse, or let the agent do it'),
       h(
         'p',
         { class: 'lede' },
         creds
-          ? 'Tell me what you need. I browse in this tab while you watch, and you can take over anytime.'
-          : 'Sign in with ChatGPT to let the agent browse for you. You can still browse on your own.',
+          ? 'I browse in this tab while you watch. Take over anytime.'
+          : 'Sign in with ChatGPT to let the agent browse for you.',
       ),
       h(
         'div',
-        { class: 'suggestions' },
+        { class: 'starters' },
         ...SUGGESTIONS.map((s) =>
           h(
             'button',
-            { class: 'suggestion', type: 'button', onclick: () => this.submit(s.prompt) },
+            { class: 'starter', type: 'button', onclick: () => this.submit(s.prompt) },
             h('strong', {}, s.title),
             h('span', {}, s.prompt),
           ),
@@ -562,19 +565,19 @@ export class BrowserScreen {
     this.syncTabsButton();
 
     const log = tab.log;
-    log.append(bubble('user', text));
-    const activity = h('div', { class: 'activity' });
-    const thinking = h('div', { class: 'typing' }, h('span'), h('span'), h('span'));
-    log.append(activity, thinking);
+    const turn = h('div', { class: 'turn' });
+    turn.append(h('div', { class: 'msg user' }, text));
+    const steps = new StepsBlock();
+    const answer = h('div', { class: 'msg assistant' });
+    const thinking = h('div', { class: 'thinking' }, h('span', { class: 'dot' }));
+    turn.append(steps.el, answer, thinking);
+    log.append(turn);
     scrollToEnd(log);
 
-    let pending: HTMLElement | null = null;
-    const ensureBubble = (): HTMLElement => {
-      if (!pending) {
-        pending = bubble('assistant', '');
-        log.insertBefore(pending, thinking);
-      }
-      return pending;
+    let streamed = '';
+    const openLink = (url: string): void => this.openUrl(tab, url);
+    const renderAnswer = (value: string): void => {
+      answer.replaceChildren(renderMarkdown(value, openLink));
     };
 
     // Give the model the page this tab shows.
@@ -589,32 +592,30 @@ export class BrowserScreen {
         {
           shouldStop: () => tab.stopRequested,
           onAssistantDelta: (delta) => {
-            ensureBubble().textContent += delta;
+            streamed += delta;
+            renderAnswer(streamed);
             scrollToEnd(log);
           },
           onToolStart: (name, args) => {
-            activity.append(toolChip(name, args));
+            steps.start(toolLabel(name, args));
             scrollToEnd(log);
           },
-          onToolEnd: (_name, ok) => {
-            activity.lastElementChild?.classList.add(ok ? 'done' : 'failed');
-          },
+          onToolEnd: (_name, ok) => steps.end(ok),
         },
         tab.browser,
       );
       tab.agentState = result.state;
-      const answer = result.assistantText || (tab.stopRequested ? 'Stopped.' : 'Done.');
-      if (!pending || !(pending as HTMLElement).textContent) ensureBubble().textContent = answer;
-      tab.lastText = answer;
+      const final = result.assistantText || streamed || (tab.stopRequested ? 'Stopped.' : 'Done.');
+      renderAnswer(final);
+      tab.lastText = final.replace(/\s+/g, ' ').slice(0, 120);
       if (tab !== this.active) toast(`Tab ${this.tabs.indexOf(tab) + 1}: agent finished`);
     } catch (error) {
-      const err = bubble('assistant', friendlyError(error));
-      err.classList.add('error');
-      log.insertBefore(err, thinking);
-      tab.lastText = err.textContent ?? '';
+      answer.classList.add('error');
+      answer.textContent = friendlyError(error);
+      tab.lastText = answer.textContent;
     } finally {
       thinking.remove();
-      if (!activity.childElementCount) activity.remove();
+      steps.finish();
       tab.busy = false;
       scrollToEnd(log);
       if (tab === this.active) this.syncComposer();
@@ -726,5 +727,46 @@ export class BrowserScreen {
       h('div', { class: 'tabs-foot' }, newBtn),
     );
     document.body.append(overlay);
+  }
+}
+
+/** ChatGPT-style collapsible "Browsing · N steps" block for agent actions. */
+class StepsBlock {
+  readonly el: HTMLElement;
+  private head: HTMLButtonElement;
+  private list: HTMLElement;
+  private count = 0;
+
+  constructor() {
+    this.head = h('button', { class: 'steps-head', type: 'button' });
+    this.list = h('ol', { class: 'steps-list' });
+    this.el = h('div', { class: 'steps', hidden: true }, this.head, this.list);
+    this.head.addEventListener('click', () => this.el.classList.toggle('open'));
+    this.renderHead(true);
+  }
+
+  start(label: string): void {
+    this.el.hidden = false;
+    this.count += 1;
+    this.list.append(h('li', { class: 'running' }, h('span', { class: 'step-dot' }), h('span', {}, label)));
+    this.renderHead(true, label);
+  }
+
+  end(ok: boolean): void {
+    const li = this.list.lastElementChild;
+    li?.classList.remove('running');
+    li?.classList.add(ok ? 'ok' : 'failed');
+  }
+
+  finish(): void {
+    if (this.count) this.renderHead(false);
+  }
+
+  private renderHead(running: boolean, current?: string): void {
+    this.head.replaceChildren(
+      running ? h('span', { class: 'spinner' }) : icon('globe'),
+      h('span', { class: 'steps-title' }, running ? (current ?? 'Browsing…') : `Browsed · ${this.count} ${this.count === 1 ? 'step' : 'steps'}`),
+      icon('chevron', 'icon steps-chevron'),
+    );
   }
 }

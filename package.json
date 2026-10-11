@@ -16,6 +16,7 @@
     "@capacitor/app": "^8.0.0",
     "@capacitor/core": "^8.5.3",
     "@capacitor/ios": "^8.5.3",
+    "@capacitor/keyboard": "^8",
     "@capgo/capacitor-inappbrowser": "^8.22.2",
     "@capgo/capacitor-speech-recognition": "^8.4.1",
     "@capgo/native-navigation": "^8.0.8",
