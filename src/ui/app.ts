@@ -143,24 +143,49 @@ export class App {
     });
     skip.addEventListener('click', finish);
 
-    // Swipe between slides.
+    // Swipe between slides. Listen on the fixed viewport (not the moving
+    // track) so every slide responds, and let the slide follow the finger.
+    const viewport = h('div', { class: 'slides-viewport' }, track);
     let startX = 0;
-    track.addEventListener('touchstart', (e) => {
+    let startY = 0;
+    let dragging = false;
+    viewport.addEventListener('touchstart', (e) => {
       startX = e.touches[0]?.clientX ?? 0;
+      startY = e.touches[0]?.clientY ?? 0;
+      dragging = false;
     }, { passive: true });
-    track.addEventListener('touchend', (e) => {
+    viewport.addEventListener('touchmove', (e) => {
+      const dx = (e.touches[0]?.clientX ?? 0) - startX;
+      const dy = (e.touches[0]?.clientY ?? 0) - startY;
+      if (!dragging && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+        dragging = true;
+        track.style.transition = 'none';
+      }
+      if (!dragging) return;
+      e.preventDefault();
+      // Resist at the ends.
+      const atEdge = (index === 0 && dx > 0) || (index === ONBOARDING.length - 1 && dx < 0);
+      track.style.transform = `translateX(calc(${-index * 100}% + ${atEdge ? dx / 3 : dx}px))`;
+    }, { passive: false });
+    const endSwipe = (e: TouchEvent): void => {
+      track.style.transition = '';
+      if (!dragging) return;
+      dragging = false;
       const dx = (e.changedTouches[0]?.clientX ?? 0) - startX;
-      if (Math.abs(dx) < 40) return;
-      index = Math.min(ONBOARDING.length - 1, Math.max(0, index + (dx < 0 ? 1 : -1)));
+      if (Math.abs(dx) > 50) {
+        index = Math.min(ONBOARDING.length - 1, Math.max(0, index + (dx < 0 ? 1 : -1)));
+      }
       update();
-    });
+    };
+    viewport.addEventListener('touchend', endSwipe);
+    viewport.addEventListener('touchcancel', endSwipe);
 
     update();
     return h(
       'section',
       { class: 'screen onboarding' },
       h('div', { class: 'topbar' }, h('span'), skip),
-      h('div', { class: 'slides-viewport' }, track),
+      viewport,
       h('div', { class: 'onboarding-footer' }, dots, next),
     );
   }
@@ -396,24 +421,30 @@ export class App {
       );
     }
 
-    const bundle = await currentBundle();
+    // About footer: app icon, versions, maker, and the "Made with Capgo" pill.
+    const maker = h('a', { href: APP_LINKS.makerX, class: 'about-link' }, 'Martin Donadieu');
+    maker.addEventListener('click', (e) => {
+      e.preventDefault();
+      void openExternal(APP_LINKS.makerX);
+    });
     const capgo = h(
       'button',
-      { class: 'capgo-card', type: 'button', 'aria-label': 'Live updates by Capgo, open capgo.app' },
+      { class: 'capgo-pill', type: 'button', 'aria-label': 'Made with Capgo, open capgo.app' },
       icon('capgo', 'capgo-logo'),
-      h(
-        'div',
-        {},
-        h('strong', {}, 'Live updates by Capgo'),
-        h('span', {}, 'Fixes and new features arrive instantly, without waiting for the App Store.'),
-        h('span', { class: 'capgo-version' }, bundle),
-      ),
-      icon('external'),
+      h('span', {}, 'Made with Capgo'),
     );
     capgo.addEventListener('click', () => void openExternal(APP_LINKS.capgo));
-    rows.append(capgo);
-
-    rows.append(h('p', { class: 'fine center' }, `Auto Browse ${APP_VERSION} · Not affiliated with OpenAI`));
+    rows.append(
+      h(
+        'div',
+        { class: 'about' },
+        h('img', { class: 'about-icon', src: '/app-icon.png', alt: 'Auto Browse' }),
+        h('p', { class: 'about-version' }, await versionLine()),
+        h('p', { class: 'about-maker' }, 'Made by ', maker),
+        h('p', { class: 'about-note' }, 'Built with Capacitor and shipped with Capgo live updates. Not affiliated with OpenAI.'),
+        capgo,
+      ),
+    );
     close = this.openSheet('Settings', h('div', { class: 'sheet-body' }, rows));
   }
 }
@@ -455,13 +486,12 @@ function link(label: string, url: string): HTMLElement {
 }
 
 
-/** "App 1.0.0 · Live bundle 1.0.3" (or builtin) for the Capgo card. */
-async function currentBundle(): Promise<string> {
+/** "Version 1.0.0 · 1.0.2": native app version, then the live Capgo bundle when one is active. */
+async function versionLine(): Promise<string> {
   if (!Capacitor.isNativePlatform()) return `Version ${APP_VERSION}`;
   try {
     const info = await CapacitorUpdater.current();
-    const live = info.bundle.id === 'builtin' ? 'built-in bundle' : `live bundle ${info.bundle.version}`;
-    return `App ${info.native} · ${live}`;
+    return info.bundle.id === 'builtin' ? `Version ${info.native}` : `Version ${info.native} · ${info.bundle.version}`;
   } catch {
     return `Version ${APP_VERSION}`;
   }
