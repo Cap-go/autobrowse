@@ -19,6 +19,8 @@ const config: CapacitorConfig = {
     // Delta uploads (only changed files) keep downloads tiny.
     CapacitorUpdater: {
       autoUpdate: true,
+      // Devices ask for this channel even if no default channel is set in Capgo.
+      defaultChannel: 'production',
       // A bad bundle that never calls notifyAppReady() is rolled back.
       appReadyTimeout: 10000,
     },
