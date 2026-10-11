@@ -844,3 +844,122 @@ h3 {
     transition: none !important;
   }
 }
+
+/* ---------- Agent browser (native webview laid over .browser-slot) ---------- */
+
+.browser-slot,
+.browser-bar {
+  display: none;
+}
+
+.main.browser-on .browser-slot {
+  display: grid;
+  place-items: center;
+  flex: 0 0 52%;
+  min-height: 160px;
+  background: var(--bg-2);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.main.browser-on.browser-focus .browser-slot {
+  flex: 1 1 auto;
+}
+
+.slot-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.browser-slot.loaded .slot-placeholder {
+  visibility: hidden;
+}
+
+.main.browser-on .browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 6px 2px 14px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.browser-bar .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.browser-bar .icon-btn .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.page-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Focus mode: the page takes the screen, the chat floats as a compact strip. */
+.main.browser-on.browser-focus .chat-log {
+  flex: 0 0 auto;
+  max-height: 110px;
+  padding-top: 8px;
+}
+
+.main.browser-on .chat-log .empty {
+  display: none;
+}
+
+.mic {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--muted);
+}
+
+.mic.listening {
+  background: var(--danger);
+  color: #fff;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(248, 113, 113, 0);
+  }
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 96px);
+  transform: translateX(-50%);
+  max-width: 88%;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  font-size: 14px;
+  z-index: 20;
+  animation: fade-in 0.2s ease-out;
+  transition: opacity 0.3s ease;
+}
+
+.toast.out {
+  opacity: 0;
+}

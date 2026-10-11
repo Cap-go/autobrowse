@@ -16,8 +16,16 @@ export async function runBrowserTool(
     }
     case 'browser_screenshot': {
       const base64 = await browser.takeScreenshot();
+      const viewport = await browser.viewportSize().catch(() => null);
       return [
-        { type: 'input_text', text: JSON.stringify({ ok: true }) },
+        {
+          type: 'input_text',
+          text: JSON.stringify({
+            ok: true,
+            viewport,
+            note: 'Click/type coordinates are CSS pixels of the viewport; the image may be larger (device pixels).',
+          }),
+        },
         {
           type: 'input_image',
           image_url: base64.startsWith('data:') ? base64 : `data:image/png;base64,${base64}`,

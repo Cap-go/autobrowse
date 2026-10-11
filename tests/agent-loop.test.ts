@@ -9,9 +9,15 @@ const browserPlugin = {
     listeners.set(name, listener);
     return { remove: async () => {} };
   }),
-  openWebView: mock(async () => ({ id: 'webview_1' })),
+  openWebView: mock(async () => {
+    setTimeout(() => listeners.get('browserPageLoaded')?.({ id: 'webview_1', url: '' }), 0);
+    return { id: 'webview_1' };
+  }),
   close: mock(async () => {}),
-  setUrl: mock(async () => {}),
+  setUrl: mock(async () => {
+    setTimeout(() => listeners.get('browserPageLoaded')?.({ id: 'webview_1', url: '' }), 0);
+  }),
+  updateDimensions: mock(async () => {}),
   goBack: mock(async () => {}),
   takeScreenshot: mock(async () => ({ base64: 'c2NyZWVuc2hvdA==' })),
   dispatchInputEvent: mock(async () => {}),
@@ -19,7 +25,7 @@ const browserPlugin = {
 };
 mock.module('@capgo/capacitor-inappbrowser', () => ({
   InAppBrowser: browserPlugin,
-  ToolBarType: { NAVIGATION: 'navigation' },
+  ToolBarType: { NAVIGATION: 'navigation', BLANK: 'blank', COMPACT: 'compact' },
 }));
 
 const { parseResponsesJson, createResponseStream } = await import('../src/agent/responses-api');
@@ -122,6 +128,17 @@ describe('Responses streaming', () => {
     } }]);
   });
 
+  test('empty completed output falls back to streamed tool calls', async () => {
+    responses.push(sse([
+      { type: 'response.output_item.done', output_index: 0, item: call('1') },
+      { type: 'response.completed', response: { id: 'resp_empty', output: [] } },
+    ]));
+    const events = [];
+    for await (const event of await createResponseStream({ accessToken: 'token', messages: [] })) events.push(event);
+    const done = events[0] as { type: 'completed'; parsed: { toolCalls: unknown[] } };
+    expect(done.parsed.toolCalls).toHaveLength(1);
+  });
+
   test('completed payload supplies tool calls and final text without added events', async () => {
     responses.push(sse([completed([message('Ready 🌍'), call('final')])], 1));
     const events = [];
@@ -199,11 +216,12 @@ describe('agent loop', () => {
       sse([completed([call('shot', 'browser_screenshot', {})])]),
       sse([completed([message('I can see the page.')])]));
     await runAgentTurn(creds, createInitialState('See page'));
-    expect(requests[2]?.input.at(-1)).toEqual({
-      type: 'function_call_output', call_id: 'call_shot', output: [
-        { type: 'input_text', text: '{"ok":true}' },
-        { type: 'input_image', image_url: 'data:image/png;base64,c2NyZWVuc2hvdA==', detail: 'auto' },
-      ],
+    const last = requests[2]?.input.at(-1) as { type: string; call_id: string; output: Array<Record<string, string>> };
+    expect(last.type).toBe('function_call_output');
+    expect(last.call_id).toBe('call_shot');
+    expect(JSON.parse(String(last.output[0]?.text)).ok).toBe(true);
+    expect(last.output[1]).toEqual({
+      type: 'input_image', image_url: 'data:image/png;base64,c2NyZWVuc2hvdA==', detail: 'auto',
     });
   });
 

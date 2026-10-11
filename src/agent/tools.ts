@@ -30,7 +30,7 @@ export const BROWSER_TOOLS: FunctionToolDefinition[] = [
   {
     type: 'function',
     name: 'browser_click',
-    description: 'Click at viewport coordinates in CSS pixels.',
+    description: 'Tap at viewport coordinates in CSS pixels. Prefer the x/y of an element returned by browser_read_dom.',
     parameters: {
       type: 'object',
       properties: {

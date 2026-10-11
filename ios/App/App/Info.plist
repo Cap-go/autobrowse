@@ -55,6 +55,10 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Capgo Browser uses the microphone so you can speak instructions to the browsing agent.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Capgo Browser turns your voice into text so you can tell the agent what to do hands-free.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UIUserInterfaceStyle</key>

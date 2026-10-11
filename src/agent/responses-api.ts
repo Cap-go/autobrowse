@@ -19,9 +19,14 @@ export type StreamEvent =
   | { type: 'text_delta'; delta: string }
   | { type: 'completed'; parsed: ParsedAssistantTurn };
 
-const INSTRUCTIONS = 'You are Capgo Browser, a mobile browsing agent. Use the browser tools ' +
-  'to browse and read the page before clicking. Ask the user before submitting payments, ' +
-  'making purchases, making account changes, or sending messages. Keep replies short.';
+const INSTRUCTIONS = [
+  'You are Capgo Browser, a browsing agent on the user\'s phone. The user watches the browser while you work.',
+  'Always act in the browser with your tools instead of answering from memory: open a relevant page',
+  '(for searches use https://www.google.com/search?q=...), then call browser_read_dom to read text and',
+  'get clickable elements with their x/y centers. Tap using those coordinates. Re-read after each navigation.',
+  'Ask the user before payments, purchases, account changes, posting, or sending messages.',
+  'When done, answer in a few short lines or bullets.',
+].join(' ');
 
 let cachedModel: { token: string; slug: string } | null = null;
 
@@ -160,10 +165,14 @@ async function* parseSseStream(body: ReadableStream<Uint8Array>): AsyncIterable<
         }
         if (type === 'response.completed') {
           // The final payload is authoritative; done items cover streams without output here.
+          // With store:false the completed payload can carry an empty output
+          // array; fall back to the items collected from the stream.
+          const finalOutput = response?.output as unknown[] | undefined;
+          const streamed = [...outputItems.entries()]
+            .sort(([a], [b]) => a - b).map(([, item]) => item);
           const parsed = parseResponsesJson({
             id: responseId,
-            output: response?.output ?? [...outputItems.entries()]
-              .sort(([a], [b]) => a - b).map(([, item]) => item),
+            output: finalOutput?.length ? finalOutput : streamed,
           });
           if (!parsed.assistantText) parsed.assistantText = assistantText;
           yield { type: 'completed', parsed };

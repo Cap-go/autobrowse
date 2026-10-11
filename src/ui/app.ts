@@ -8,9 +8,18 @@ import {
   runAgentTurn,
   type AgentLoopState,
 } from '../agent/loop';
-import { closeBrowser, openBrowser } from '../browser/browser-controller';
+import {
+  closeBrowser,
+  currentUrl,
+  isBrowserOpen,
+  onBrowserStateChange,
+  openBrowser,
+  setBrowserFrame,
+  setBrowserVisible,
+} from '../browser/browser-controller';
 import { APP_LINKS, PREF_KEYS } from '../config';
 import { h, icon } from './dom';
+import { VoiceInput } from './voice';
 
 export type Screen = 'onboarding' | 'connect' | 'main';
 
@@ -58,6 +67,8 @@ export class App {
   private creds: OAuthCredentialRecord | null = null;
   private agentState: AgentLoopState | null = null;
   private busy = false;
+  private disposeMain: (() => void) | null = null;
+  private browse: (url: string) => void = (url) => void openBrowser(url);
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -85,6 +96,8 @@ export class App {
   }
 
   private render(): void {
+    this.disposeMain?.();
+    this.disposeMain = null;
     this.root.replaceChildren();
     const view =
       this.screen === 'onboarding'
@@ -230,6 +243,10 @@ export class App {
   // ---------- Main ----------
 
   private renderMain(): HTMLElement {
+    this.disposeMain?.();
+    const cleanups: Array<() => void> = [];
+    this.disposeMain = () => cleanups.splice(0).forEach((fn) => fn());
+
     const log = h('div', { class: 'chat-log', 'aria-live': 'polite' });
     const input = h('textarea', {
       rows: 1,
@@ -238,7 +255,71 @@ export class App {
       enterkeyhint: 'send',
     });
     const send = h('button', { class: 'send', type: 'submit', 'aria-label': 'Send' }, icon('send'));
-    const form = h('form', { class: 'composer' }, input, send);
+    const mic = h('button', { class: 'mic', type: 'button', 'aria-label': 'Speak' }, icon('mic'));
+    const form = h('form', { class: 'composer' }, input);
+    if (VoiceInput.supported() && this.creds) form.append(mic);
+    form.append(send);
+
+    // ----- Browser slot: the native in-app browser is laid over this area so
+    // the user watches the agent act while the chat stays below.
+    const pageLabel = h('span', { class: 'page-label' }, 'Browser');
+    const sizeBtn = h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Expand browser' }, icon('expand'));
+    const closeBtn = h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Close browser' }, icon('close'));
+    const slot = h('div', { class: 'browser-slot' }, h('div', { class: 'slot-placeholder' }, h('span', { class: 'spinner' }), 'Opening the browser…'));
+    const bar = h('div', { class: 'browser-bar' }, icon('globe'), pageLabel, sizeBtn, closeBtn);
+    const section = h('section', { class: 'screen main' });
+
+    const syncFrame = (): void => {
+      if (!section.classList.contains('browser-on')) return;
+      const r = slot.getBoundingClientRect();
+      if (r.height < 40) return;
+      void setBrowserFrame({ x: r.left, y: r.top, width: r.width, height: r.height });
+    };
+    const setMode = (mode: 'off' | 'split' | 'focus'): void => {
+      section.classList.toggle('browser-on', mode !== 'off');
+      section.classList.toggle('browser-focus', mode === 'focus');
+      sizeBtn.replaceChildren(icon(mode === 'focus' ? 'shrink' : 'expand'));
+      sizeBtn.setAttribute('aria-label', mode === 'focus' ? 'Show chat' : 'Expand browser');
+      input.placeholder = mode === 'off'
+        ? (this.creds ? 'Ask the agent to browse…' : 'Sign in to use the agent')
+        : 'Ask about this page or say what to do…';
+      requestAnimationFrame(syncFrame);
+    };
+    const observer = new ResizeObserver(syncFrame);
+    observer.observe(slot);
+    cleanups.push(() => observer.disconnect());
+    const onResize = (): void => syncFrame();
+    window.addEventListener('resize', onResize);
+    cleanups.push(() => window.removeEventListener('resize', onResize));
+
+    sizeBtn.addEventListener('click', () => {
+      setMode(section.classList.contains('browser-focus') ? 'split' : 'focus');
+    });
+    closeBtn.addEventListener('click', () => {
+      void closeBrowser();
+      setMode('off');
+    });
+    cleanups.push(
+      onBrowserStateChange((open) => {
+        if (open && !section.classList.contains('browser-on')) setMode('split');
+        if (!open && !this.busy) setMode('off');
+        slot.classList.toggle('loaded', open);
+      }),
+    );
+    const urlTimer = window.setInterval(() => {
+      const url = currentUrl();
+      pageLabel.textContent = url ? prettyUrl(url) : 'Browser';
+    }, 500);
+    cleanups.push(() => window.clearInterval(urlTimer));
+
+    const browse = (url: string): void => {
+      setMode('split');
+      requestAnimationFrame(() => {
+        syncFrame();
+        void openBrowser(url);
+      });
+    };
+    this.browse = browse;
 
     const empty = this.renderEmptyState((prompt) => {
       input.value = prompt;
@@ -262,6 +343,50 @@ export class App {
     });
     syncSend();
 
+    // ----- Voice
+    const voice = new VoiceInput();
+    cleanups.push(() => void voice.stop());
+    mic.addEventListener('click', async () => {
+      if (voice.listening) {
+        await voice.stop();
+        return;
+      }
+      mic.classList.add('listening');
+      mic.replaceChildren(icon('stop'));
+      input.value = '';
+      input.placeholder = 'Listening…';
+      const reset = (): void => {
+        mic.classList.remove('listening');
+        mic.replaceChildren(icon('mic'));
+        input.placeholder = section.classList.contains('browser-on')
+          ? 'Ask about this page or say what to do…'
+          : 'Ask the agent to browse…';
+      };
+      try {
+        await voice.start({
+          onPartial: (text) => {
+            input.value = text;
+            autoGrow(input);
+            syncSend();
+          },
+          onEnd: (text) => {
+            reset();
+            if (text) {
+              input.value = text;
+              form.requestSubmit();
+            }
+          },
+          onError: (message) => {
+            reset();
+            toast(message);
+          },
+        });
+      } catch (error) {
+        reset();
+        toast(friendlyError(error));
+      }
+    });
+
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const text = input.value.trim();
@@ -275,6 +400,7 @@ export class App {
       autoGrow(input);
       this.busy = true;
       syncSend();
+      if (!section.classList.contains('browser-on')) setMode('split');
 
       log.append(bubble('user', text));
       const thinking = h('div', { class: 'typing' }, h('span'), h('span'), h('span'));
@@ -291,10 +417,14 @@ export class App {
         return pending;
       };
 
+      // Give the model the page the user is looking at.
+      const pageUrl = currentUrl();
+      const modelText = pageUrl ? `${text}\n\n(The browser currently shows ${pageUrl})` : text;
+
       try {
         const state = this.agentState
-          ? appendUserMessage(this.agentState, text)
-          : createInitialState(text);
+          ? appendUserMessage(this.agentState, modelText)
+          : createInitialState(modelText);
         const result = await runAgentTurn(this.creds, state, {
           onAssistantDelta: (delta) => {
             ensureBubble().textContent += delta;
@@ -323,6 +453,7 @@ export class App {
         this.busy = false;
         syncSend();
         scrollToEnd(log);
+        if (!isBrowserOpen()) setMode('off');
       }
     });
 
@@ -341,6 +472,7 @@ export class App {
             'aria-label': 'New chat',
             onclick: () => {
               this.agentState = null;
+              void closeBrowser();
               this.render();
             },
           },
@@ -352,7 +484,7 @@ export class App {
             class: 'icon-btn',
             type: 'button',
             'aria-label': 'Open browser',
-            onclick: () => void openBrowser('https://www.google.com'),
+            onclick: () => browse('https://www.google.com'),
           },
           icon('globe'),
         ),
@@ -382,7 +514,9 @@ export class App {
       );
     }
 
-    return h('section', { class: 'screen main' }, header, log, footer);
+    section.append(header, slot, bar, log, footer);
+    if (isBrowserOpen()) setMode('split');
+    return section;
   }
 
   private renderEmptyState(onPick: (prompt: string) => void): HTMLElement {
@@ -399,7 +533,7 @@ export class App {
     urlForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const url = toUrl(urlInput.value);
-      if (url) void openBrowser(url);
+      if (url) this.browse(url);
     });
 
     return h(
@@ -422,7 +556,7 @@ export class App {
         'div',
         { class: 'quick-sites' },
         ...QUICK_SITES.map((site) =>
-          h('button', { class: 'chip', type: 'button', onclick: () => void openBrowser(site.url) }, site.label),
+          h('button', { class: 'chip', type: 'button', onclick: () => this.browse(site.url) }, site.label),
         ),
       ),
       h('p', { class: 'section-label' }, 'Try asking'),
@@ -457,7 +591,10 @@ export class App {
       content,
     );
     const backdrop = h('div', { class: 'backdrop' }, sheet);
+    // The native browser sits above the HTML layer; hide it under sheets.
+    void setBrowserVisible(false);
     const close = (): void => {
+      void setBrowserVisible(true);
       backdrop.classList.add('closing');
       window.setTimeout(() => backdrop.remove(), 200);
     };
@@ -557,6 +694,7 @@ export class App {
 
     if (this.creds) {
       const out = row('Sign out', 'logout', async () => {
+        await closeBrowser().catch(() => undefined);
         await signOut();
         this.creds = null;
         this.agentState = null;
@@ -651,6 +789,22 @@ function toolChip(name: string, args?: Record<string, unknown>): HTMLElement {
     }
   }
   return h('div', { class: 'tool-chip' }, h('span', { class: 'spinner' }), icon('check', 'icon ok'), h('span', {}, label));
+}
+
+function prettyUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.hostname.replace(/^www\./, '') + (u.pathname.length > 1 ? u.pathname : '');
+  } catch {
+    return url;
+  }
+}
+
+function toast(message: string): void {
+  const el = h('div', { class: 'toast', role: 'status' }, message);
+  document.body.append(el);
+  window.setTimeout(() => el.classList.add('out'), 2600);
+  window.setTimeout(() => el.remove(), 3000);
 }
 
 function scrollToEnd(el: HTMLElement): void {
