@@ -1,12 +1,13 @@
 // Compose App Store marketing screenshots from ../raw: bun frame.mjs
 import { chromium } from 'playwright';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const shots = [
   { raw: 'chat', kicker: 'AI BROWSING AGENT', title: 'Ask it.<br/>It browses for you.' },
   { raw: 'shopping', kicker: 'SAVE TIME', title: 'Compare prices<br/>in seconds.' },
-  { raw: 'main', kicker: 'ANY WEBSITE', title: 'One simple chat<br/>for the whole web.' },
+  { raw: 'main', kicker: 'A REAL BROWSER', title: 'Browse yourself,<br/>or let it browse.' },
+  { raw: 'tabs', kicker: 'MANY TABS', title: 'Several agents,<br/>side by side.' },
   { raw: 'onboarding-2', kicker: 'SAFE BY DEFAULT', title: 'It asks before<br/>anything important.' },
   { raw: 'connect', kicker: 'PRIVATE', title: 'Runs on your<br/>ChatGPT plan.' },
 ];
@@ -35,7 +36,10 @@ const html = (img, s) => `<!doctype html><html><head><style>
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 440, height: 956 }, deviceScaleFactor: 3 });
-for (const size of sizes) mkdirSync(`../screenshots/${size.dir}`, { recursive: true });
+for (const size of sizes) {
+  rmSync(`../screenshots/${size.dir}`, { recursive: true, force: true });
+  mkdirSync(`../screenshots/${size.dir}`, { recursive: true });
+}
 let i = 1;
 for (const s of shots) {
   const img = readFileSync(`../raw/${s.raw}.png`).toString('base64');

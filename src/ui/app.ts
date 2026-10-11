@@ -2,24 +2,10 @@ import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
 import { completeSignIn } from '../auth/oauth';
 import { loadLatestCredentials, signOut } from '../auth/token-store';
 import type { OAuthCredentialRecord } from '../auth/types';
-import {
-  appendUserMessage,
-  createInitialState,
-  runAgentTurn,
-  type AgentLoopState,
-} from '../agent/loop';
-import {
-  closeBrowser,
-  currentUrl,
-  isBrowserOpen,
-  onBrowserStateChange,
-  openBrowser,
-  setBrowserFrame,
-  setBrowserVisible,
-} from '../browser/browser-controller';
 import { APP_LINKS, PREF_KEYS } from '../config';
+import { BrowserScreen } from './browser-screen';
 import { h, icon } from './dom';
-import { VoiceInput } from './voice';
+import { friendlyError, openExternal, row } from './helpers';
 
 export type Screen = 'onboarding' | 'connect' | 'main';
 
@@ -48,27 +34,16 @@ const ONBOARDING = [
   },
 ];
 
-const SUGGESTIONS = [
-  { title: 'Compare prices', prompt: 'Find the best price for a 27 inch 4K monitor and list the top 3 stores.' },
-  { title: 'Summarize news', prompt: 'Open Hacker News and summarize the top 5 stories.' },
-  { title: 'Plan a trip', prompt: 'Find 3 well rated cafés near the Louvre in Paris.' },
-  { title: 'Read for me', prompt: 'Open wikipedia.org and explain what Capacitor JS is in 3 bullets.' },
-];
-
-const QUICK_SITES = [
-  { label: 'Google', url: 'https://www.google.com' },
-  { label: 'Wikipedia', url: 'https://www.wikipedia.org' },
-  { label: 'Hacker News', url: 'https://news.ycombinator.com' },
-];
-
 export class App {
   private root: HTMLElement;
   private screen: Screen = 'onboarding';
   private creds: OAuthCredentialRecord | null = null;
-  private agentState: AgentLoopState | null = null;
-  private busy = false;
-  private disposeMain: (() => void) | null = null;
-  private browse: (url: string) => void = (url) => void openBrowser(url);
+  private screenView = new BrowserScreen({
+    creds: () => this.creds,
+    openSignIn: () => this.openSignInSheet(),
+    openSettings: () => this.openSettings(),
+    openSheet: (title, content) => this.openSheet(title, content),
+  });
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -96,8 +71,9 @@ export class App {
   }
 
   private render(): void {
-    this.disposeMain?.();
-    this.disposeMain = null;
+    this.screenView.dispose();
+    if (this.screen !== 'main') this.screenView.hidePagesFor(true);
+    else this.screenView.hidePagesFor(false);
     this.root.replaceChildren();
     const view =
       this.screen === 'onboarding'
@@ -243,349 +219,7 @@ export class App {
   // ---------- Main ----------
 
   private renderMain(): HTMLElement {
-    this.disposeMain?.();
-    const cleanups: Array<() => void> = [];
-    this.disposeMain = () => cleanups.splice(0).forEach((fn) => fn());
-
-    const log = h('div', { class: 'chat-log', 'aria-live': 'polite' });
-    const input = h('textarea', {
-      rows: 1,
-      placeholder: this.creds ? 'Ask the agent to browse…' : 'Sign in to use the agent',
-      'aria-label': 'Message',
-      enterkeyhint: 'send',
-    });
-    const send = h('button', { class: 'send', type: 'submit', 'aria-label': 'Send' }, icon('send'));
-    const mic = h('button', { class: 'mic', type: 'button', 'aria-label': 'Speak' }, icon('mic'));
-    const form = h('form', { class: 'composer' }, input);
-    if (VoiceInput.supported() && this.creds) form.append(mic);
-    form.append(send);
-
-    // ----- Browser slot: the native in-app browser is laid over this area so
-    // the user watches the agent act while the chat stays below.
-    const pageLabel = h('span', { class: 'page-label' }, 'Browser');
-    const sizeBtn = h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Expand browser' }, icon('expand'));
-    const closeBtn = h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Close browser' }, icon('close'));
-    const slot = h('div', { class: 'browser-slot' }, h('div', { class: 'slot-placeholder' }, h('span', { class: 'spinner' }), 'Opening the browser…'));
-    const bar = h('div', { class: 'browser-bar' }, icon('globe'), pageLabel, sizeBtn, closeBtn);
-    const section = h('section', { class: 'screen main' });
-
-    const syncFrame = (): void => {
-      if (!section.classList.contains('browser-on')) return;
-      const r = slot.getBoundingClientRect();
-      if (r.height < 40) return;
-      void setBrowserFrame({ x: r.left, y: r.top, width: r.width, height: r.height });
-    };
-    const setMode = (mode: 'off' | 'split' | 'focus'): void => {
-      section.classList.toggle('browser-on', mode !== 'off');
-      section.classList.toggle('browser-focus', mode === 'focus');
-      sizeBtn.replaceChildren(icon(mode === 'focus' ? 'shrink' : 'expand'));
-      sizeBtn.setAttribute('aria-label', mode === 'focus' ? 'Show chat' : 'Expand browser');
-      input.placeholder = mode === 'off'
-        ? (this.creds ? 'Ask the agent to browse…' : 'Sign in to use the agent')
-        : 'Ask about this page or say what to do…';
-      requestAnimationFrame(syncFrame);
-    };
-    const observer = new ResizeObserver(syncFrame);
-    observer.observe(slot);
-    cleanups.push(() => observer.disconnect());
-    const onResize = (): void => syncFrame();
-    window.addEventListener('resize', onResize);
-    cleanups.push(() => window.removeEventListener('resize', onResize));
-
-    sizeBtn.addEventListener('click', () => {
-      setMode(section.classList.contains('browser-focus') ? 'split' : 'focus');
-    });
-    closeBtn.addEventListener('click', () => {
-      void closeBrowser();
-      setMode('off');
-    });
-    cleanups.push(
-      onBrowserStateChange((open) => {
-        if (open && !section.classList.contains('browser-on')) setMode('split');
-        if (!open && !this.busy) setMode('off');
-        slot.classList.toggle('loaded', open);
-      }),
-    );
-    const urlTimer = window.setInterval(() => {
-      const url = currentUrl();
-      if (url) pageLabel.textContent = prettyUrl(url);
-    }, 500);
-    cleanups.push(() => window.clearInterval(urlTimer));
-
-    const browse = (url: string): void => {
-      setMode('split');
-      requestAnimationFrame(() => {
-        syncFrame();
-        void openBrowser(url);
-      });
-    };
-    this.browse = browse;
-
-    const empty = this.renderEmptyState((prompt) => {
-      input.value = prompt;
-      autoGrow(input);
-      form.requestSubmit();
-    });
-    log.append(empty);
-
-    let stopRequested = false;
-    const syncSend = (): void => {
-      // While the agent works the send button becomes Stop.
-      send.disabled = !this.busy && !input.value.trim();
-      send.classList.toggle('stop', this.busy);
-      send.replaceChildren(icon(this.busy ? 'stop' : 'send'));
-      send.setAttribute('aria-label', this.busy ? 'Stop' : 'Send');
-    };
-    input.addEventListener('input', () => {
-      autoGrow(input);
-      syncSend();
-    });
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-        e.preventDefault();
-        form.requestSubmit();
-      }
-    });
-    syncSend();
-
-    // ----- Voice
-    const voice = new VoiceInput();
-    cleanups.push(() => void voice.stop());
-    mic.addEventListener('click', async () => {
-      if (voice.listening) {
-        await voice.stop();
-        return;
-      }
-      mic.classList.add('listening');
-      mic.replaceChildren(icon('stop'));
-      input.value = '';
-      input.placeholder = 'Listening…';
-      const reset = (): void => {
-        mic.classList.remove('listening');
-        mic.replaceChildren(icon('mic'));
-        input.placeholder = section.classList.contains('browser-on')
-          ? 'Ask about this page or say what to do…'
-          : 'Ask the agent to browse…';
-      };
-      try {
-        await voice.start({
-          onPartial: (text) => {
-            input.value = text;
-            autoGrow(input);
-            syncSend();
-          },
-          onEnd: (text) => {
-            reset();
-            if (text) {
-              input.value = text;
-              form.requestSubmit();
-            }
-          },
-          onError: (message) => {
-            reset();
-            toast(message);
-          },
-        });
-      } catch (error) {
-        reset();
-        toast(friendlyError(error));
-      }
-    });
-
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      if (this.busy) {
-        stopRequested = true;
-        send.disabled = true;
-        return;
-      }
-      const text = input.value.trim();
-      if (!text) return;
-      if (!this.creds) {
-        this.openSignInSheet();
-        return;
-      }
-      stopRequested = false;
-      empty.remove();
-      input.value = '';
-      autoGrow(input);
-      this.busy = true;
-      syncSend();
-      if (!section.classList.contains('browser-on')) setMode('split');
-
-      log.append(bubble('user', text));
-      const thinking = h('div', { class: 'typing' }, h('span'), h('span'), h('span'));
-      let pending: HTMLElement | null = null;
-      const activity = h('div', { class: 'activity' });
-      log.append(activity, thinking);
-      scrollToEnd(log);
-
-      const ensureBubble = (): HTMLElement => {
-        if (!pending) {
-          pending = bubble('assistant', '');
-          log.insertBefore(pending, thinking);
-        }
-        return pending;
-      };
-
-      // Give the model the page the user is looking at.
-      const pageUrl = currentUrl();
-      const modelText = pageUrl ? `${text}\n\n(The browser currently shows ${pageUrl})` : text;
-
-      try {
-        const state = this.agentState
-          ? appendUserMessage(this.agentState, modelText)
-          : createInitialState(modelText);
-        const result = await runAgentTurn(this.creds, state, {
-          shouldStop: () => stopRequested,
-          onAssistantDelta: (delta) => {
-            ensureBubble().textContent += delta;
-            scrollToEnd(log);
-          },
-          onToolStart: (name, args) => {
-            activity.append(toolChip(name, args));
-            scrollToEnd(log);
-          },
-          onToolEnd: (_name, ok) => {
-            const chip = activity.lastElementChild;
-            chip?.classList.add(ok ? 'done' : 'failed');
-          },
-        });
-        this.agentState = result.state;
-        if (!pending || !(pending as HTMLElement).textContent) {
-          ensureBubble().textContent =
-            result.assistantText || (stopRequested ? 'Stopped.' : 'Done.');
-        }
-      } catch (error) {
-        const err = bubble('assistant', friendlyError(error));
-        err.classList.add('error');
-        log.insertBefore(err, thinking);
-      } finally {
-        thinking.remove();
-        if (!activity.childElementCount) activity.remove();
-        this.busy = false;
-        syncSend();
-        scrollToEnd(log);
-        if (!isBrowserOpen()) setMode('off');
-      }
-    });
-
-    const header = h(
-      'header',
-      { class: 'appbar' },
-      h('div', { class: 'appbar-title' }, icon('logo', 'mini-logo'), h('span', {}, 'Auto Browse')),
-      h(
-        'div',
-        { class: 'appbar-actions' },
-        h(
-          'button',
-          {
-            class: 'icon-btn',
-            type: 'button',
-            'aria-label': 'New chat',
-            onclick: () => {
-              this.agentState = null;
-              void closeBrowser();
-              this.render();
-            },
-          },
-          icon('plus'),
-        ),
-        h(
-          'button',
-          {
-            class: 'icon-btn',
-            type: 'button',
-            'aria-label': 'Open browser',
-            onclick: () => browse('https://www.google.com'),
-          },
-          icon('globe'),
-        ),
-        h(
-          'button',
-          {
-            class: 'icon-btn',
-            type: 'button',
-            'aria-label': 'Settings',
-            onclick: () => this.openSettings(),
-          },
-          icon('settings'),
-        ),
-      ),
-    );
-
-    const footer = h('footer', { class: 'composer-wrap' }, form);
-    if (!this.creds) {
-      footer.prepend(
-        h(
-          'button',
-          { class: 'signin-banner', type: 'button', onclick: () => this.openSignInSheet() },
-          icon('sparkles'),
-          h('span', {}, 'Sign in with ChatGPT to let the agent browse for you'),
-          icon('chevron'),
-        ),
-      );
-    }
-
-    section.append(header, slot, bar, log, footer);
-    if (isBrowserOpen()) setMode('split');
-    return section;
-  }
-
-  private renderEmptyState(onPick: (prompt: string) => void): HTMLElement {
-    const urlInput = h('input', {
-      type: 'url',
-      inputmode: 'url',
-      placeholder: 'Search or enter website',
-      'aria-label': 'Website address',
-      autocapitalize: 'off',
-      autocorrect: 'off',
-      enterkeyhint: 'go',
-    });
-    const urlForm = h('form', { class: 'url-bar' }, icon('globe'), urlInput);
-    urlForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const url = toUrl(urlInput.value);
-      if (url) this.browse(url);
-    });
-
-    return h(
-      'div',
-      { class: 'empty' },
-      h(
-        'div',
-        { class: 'empty-hero' },
-        h('h2', {}, this.creds ? `What should I do${firstName(this.creds.email)}?` : 'Where to?'),
-        h(
-          'p',
-          { class: 'lede' },
-          this.creds
-            ? 'I open websites, read them and act for you. You can watch and take over anytime.'
-            : 'Open any website, or sign in with ChatGPT to let the agent do the browsing.',
-        ),
-      ),
-      urlForm,
-      h(
-        'div',
-        { class: 'quick-sites' },
-        ...QUICK_SITES.map((site) =>
-          h('button', { class: 'chip', type: 'button', onclick: () => this.browse(site.url) }, site.label),
-        ),
-      ),
-      h('p', { class: 'section-label' }, 'Try asking'),
-      h(
-        'div',
-        { class: 'suggestions' },
-        ...SUGGESTIONS.map((s) =>
-          h(
-            'button',
-            { class: 'suggestion', type: 'button', onclick: () => onPick(s.prompt) },
-            h('strong', {}, s.title),
-            h('span', {}, s.prompt),
-          ),
-        ),
-      ),
-    );
+    return this.screenView.render();
   }
 
   // ---------- Sheets ----------
@@ -605,9 +239,12 @@ export class App {
     );
     const backdrop = h('div', { class: 'backdrop' }, sheet);
     // The native browser sits above the HTML layer; hide it under sheets.
-    void setBrowserVisible(false);
+    this.screenView.hidePages();
+    let closed = false;
     const close = (): void => {
-      void setBrowserVisible(true);
+      if (closed) return;
+      closed = true;
+      this.screenView.showPages();
       backdrop.classList.add('closing');
       window.setTimeout(() => backdrop.remove(), 200);
     };
@@ -694,11 +331,10 @@ export class App {
     rows.append(
       group(
         'Data',
-        row('Close browser and clear session', 'trash', async () => {
-          await closeBrowser().catch(() => undefined);
+        row('Close all tabs and clear browsing data', 'trash', async () => {
+          await this.screenView.reset();
           await InAppBrowser.clearAllCookies().catch(() => undefined);
           await InAppBrowser.clearCache().catch(() => undefined);
-          this.agentState = null;
           close();
           this.render();
         }),
@@ -707,10 +343,9 @@ export class App {
 
     if (this.creds) {
       const out = row('Sign out', 'logout', async () => {
-        await closeBrowser().catch(() => undefined);
+        await this.screenView.reset();
         await signOut();
         this.creds = null;
-        this.agentState = null;
         close();
         this.go('connect');
       });
@@ -769,101 +404,3 @@ function link(label: string, url: string): HTMLElement {
   );
 }
 
-function row(label: string, trailing: Parameters<typeof icon>[0], onTap: () => void | Promise<void>): HTMLElement {
-  return h(
-    'button',
-    { class: 'row', type: 'button', onclick: () => void onTap() },
-    h('span', {}, label),
-    icon(trailing),
-  );
-}
-
-function bubble(role: 'user' | 'assistant', text: string): HTMLElement {
-  return h('div', { class: `bubble ${role}` }, text);
-}
-
-const TOOL_LABELS: Record<string, string> = {
-  browser_navigate: 'Opening',
-  browser_screenshot: 'Looking at the page',
-  browser_click: 'Clicking',
-  browser_type: 'Typing',
-  browser_scroll: 'Scrolling',
-  browser_read_dom: 'Reading the page',
-  browser_extract: 'Extracting details',
-};
-
-function toolChip(name: string, args?: Record<string, unknown>): HTMLElement {
-  let label = TOOL_LABELS[name] ?? name;
-  if (name === 'browser_navigate' && typeof args?.url === 'string') {
-    try {
-      label = `${label} ${new URL(args.url).hostname.replace(/^www\./, '')}`;
-    } catch {
-      /* keep label */
-    }
-  }
-  return h('div', { class: 'tool-chip' }, h('span', { class: 'spinner' }), icon('check', 'icon ok'), h('span', {}, label));
-}
-
-function prettyUrl(url: string): string {
-  try {
-    const u = new URL(url);
-    return u.hostname.replace(/^www\./, '') + (u.pathname.length > 1 ? u.pathname : '');
-  } catch {
-    return url;
-  }
-}
-
-function toast(message: string): void {
-  const el = h('div', { class: 'toast', role: 'status' }, message);
-  document.body.append(el);
-  window.setTimeout(() => el.classList.add('out'), 2600);
-  window.setTimeout(() => el.remove(), 3000);
-}
-
-function scrollToEnd(el: HTMLElement): void {
-  requestAnimationFrame(() => {
-    el.scrollTop = el.scrollHeight;
-  });
-}
-
-function autoGrow(el: HTMLTextAreaElement): void {
-  el.style.height = 'auto';
-  el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
-}
-
-function firstName(email: string): string {
-  const local = email.split('@')[0] ?? '';
-  const name = local.split(/[._-]/)[0] ?? '';
-  if (!name || /\d/.test(name)) return '';
-  return `, ${name.charAt(0).toUpperCase()}${name.slice(1)}`;
-}
-
-function toUrl(value: string): string | null {
-  const v = value.trim();
-  if (!v) return null;
-  if (/^https?:\/\//i.test(v)) return v;
-  if (/^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(v)) return `https://${v}`;
-  return `https://www.google.com/search?q=${encodeURIComponent(v)}`;
-}
-
-async function openExternal(url: string): Promise<void> {
-  try {
-    await InAppBrowser.open({ url });
-  } catch {
-    window.open(url, '_blank', 'noopener');
-  }
-}
-
-function friendlyError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  if (/usage limit/i.test(message)) {
-    return 'You reached your ChatGPT plan usage limit. Try again later.';
-  }
-  if (/cancel/i.test(message)) {
-    return 'Sign in was cancelled.';
-  }
-  if (!navigator.onLine || /internet connection appears to be offline|network connection was lost/i.test(message)) {
-    return 'No connection. Check your internet and try again.';
-  }
-  return message || 'Something went wrong. Please try again.';
-}

@@ -28,58 +28,69 @@ export async function runDemo(app: App, name: string): Promise<void> {
     app.openSettings();
     return;
   }
+  if (name === 'tabs') {
+    document.querySelector<HTMLButtonElement>('.tabs-btn')?.click();
+    await new Promise((r) => setTimeout(r, 100));
+    const grid = document.querySelector('.tab-grid');
+    const first = grid?.firstElementChild;
+    if (!grid || !first) return;
+    const cards: Array<[string, string, string, boolean]> = [
+      ['Hacker News', 'Top 3: Rust browser engine hits 1.0…', 'news', false],
+      ['27 inch 4K monitor', 'Comparing prices on 3 stores…', 'shop', true],
+      ['Cafés near the Louvre', 'Café Kitsuné, Le Nemours, Angelina', 'map', false],
+    ];
+    grid.replaceChildren(
+      ...cards.map(([title, line, kind, busy], i) => {
+        const card = first.cloneNode(true) as HTMLElement;
+        card.classList.toggle('current', i === 1);
+        const preview = card.querySelector('.tab-preview');
+        preview?.replaceChildren(kind === 'news' ? mockNews() : kind === 'shop' ? mockShopping() : h('div', { class: 'mock-map' }));
+        if (busy) preview?.append(h('span', { class: 'tab-busy' }, h('span', { class: 'spinner' }), 'Working'));
+        card.querySelector('.tab-meta strong')!.textContent = title;
+        card.querySelector('.tab-meta span')!.textContent = line;
+        return card;
+      }),
+    );
+    const head = document.querySelector('.tabs-head h3');
+    if (head) head.textContent = '3 tabs';
+    return;
+  }
   if (name === 'chat' || name === 'shopping') {
-    const log = document.querySelector('.chat-log');
-    if (!log) return;
+    const log = document.querySelector('.chat-host .chat-log');
+    const section = document.querySelector('.screen.browser');
+    const page = document.querySelector('.page-area');
+    const address = document.querySelector<HTMLInputElement>('.address input');
+    if (!log || !section || !page || !address) return;
     log.replaceChildren();
     const script =
       name === 'chat'
         ? {
+            url: 'news.ycombinator.com',
             user: 'Open Hacker News and summarize the top 3 stories.',
-            tools: [
-              ['Opening news.ycombinator.com', true],
-              ['Reading the page', true],
-            ],
+            tools: ['Opening news.ycombinator.com', 'Reading the page'],
             answer:
-              'Here are today’s top 3 on Hacker News:\n\n1. A new open source browser engine written in Rust hits 1.0.\n2. Why SQLite is quietly running your phone.\n3. Show HN: a tiny CSS framework with zero classes.\n\nWant me to open one of them?',
+              'Top 3 on Hacker News right now:\n\n1. A new open source browser engine in Rust hits 1.0.\n2. Why SQLite is quietly running your phone.\n3. Show HN: a tiny CSS framework with zero classes.',
           }
         : {
+            url: 'google.com/search',
             user: 'Find the best price for a 27 inch 4K monitor and list the top 3 stores.',
-            tools: [
-              ['Opening google.com', true],
-              ['Typing “27 inch 4K monitor”', true],
-              ['Reading the page', true],
-              ['Extracting details', true],
-            ],
-            answer:
-              'Best prices I found right now:\n\n• Tech Depot — $279, free delivery\n• MegaMart — $289, pickup today\n• PixelShop — $299\n\nTech Depot is the cheapest. Should I open the product page?',
+            tools: ['Opening google.com', 'Typing “27 inch 4K monitor”', 'Reading the page'],
+            answer: '• Tech Depot — $279, free delivery\n• MegaMart — $289, pickup today\n• PixelShop — $299\n\nTech Depot is the cheapest.',
           };
+    section.classList.add('has-page');
+    address.value = script.url;
+    page.replaceChildren(name === 'chat' ? mockNews() : mockShopping());
+    page.classList.add('demo-page');
     log.append(h('div', { class: 'bubble user' }, script.user));
     const activity = h('div', { class: 'activity' });
-    for (const [label, done] of script.tools) {
-      activity.append(
-        h(
-          'div',
-          { class: `tool-chip ${done ? 'done' : ''}` },
-          h('span', { class: 'spinner' }),
-          icon('check', 'icon ok'),
-          h('span', {}, String(label)),
-        ),
-      );
+    for (const label of script.tools) {
+      activity.append(h('div', { class: 'tool-chip done' }, h('span', { class: 'spinner' }), icon('check', 'icon ok'), h('span', {}, label)));
     }
     log.append(activity, h('div', { class: 'bubble assistant' }, script.answer));
-    // Mock page in the browser area (the real app overlays the native browser here).
-    const section = document.querySelector('.screen.main');
-    const slot = document.querySelector('.browser-slot');
-    const label = document.querySelector('.page-label');
-    if (section && slot && label) {
-      section.classList.add('browser-on');
-      slot.classList.add('loaded', 'demo-page');
-      label.textContent = name === 'chat' ? 'news.ycombinator.com' : 'google.com/search';
-      slot.replaceChildren(name === 'chat' ? mockNews() : mockShopping());
-    }
     const input = document.querySelector('textarea');
-    if (input) input.placeholder = 'Ask a follow up…';
+    if (input) input.placeholder = 'Ask about this page or say what to do…';
+    const status = document.querySelector('.agent-status');
+    if (status) status.textContent = name === 'chat' ? 'Hacker News' : '27 inch 4K monitor - Google Search';
   }
 }
 

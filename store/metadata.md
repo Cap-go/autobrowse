@@ -45,7 +45,10 @@ ASK, DON'T SEARCH
 The agent does the browsing and gives you a short answer.
 
 WATCH IT WORK
-The page opens right above the chat, so you see every step live: searching, reading, tapping, typing. Expand the page, or close it and take over at any moment.
+It looks and feels like a normal browser: address bar, tabs, back and reload. The page sits right above the chat, so you see every step live: searching, reading, tapping, typing. Drag the divider to give more room to the page or the chat, and take over at any moment.
+
+MANY TABS, MANY AGENTS
+Every tab has its own page and its own chat. Start a price comparison in one tab, plan a trip in another, and switch between them while the agents work.
 
 JUST SAY IT
 Tap the mic and speak. Your words appear as you talk and the agent starts when you stop.
@@ -86,8 +89,8 @@ First release. Ask the agent to browse for you, watch every step, and stay in co
 
 Upload in this order (already sized, no alpha):
 
-- 6.9" iPhone (1320×2868): `store/screenshots/iphone-6.9/01..05-*.png`
-- 6.5" iPhone (1284×2778): `store/screenshots/iphone-6.5/01..05-*.png`
+- 6.9" iPhone (1320×2868): `store/screenshots/iphone-6.9/01..06-*.png`
+- 6.5" iPhone (1284×2778): `store/screenshots/iphone-6.5/01..06-*.png`
 
 App icon 1024×1024 (no alpha): `store/icon/AppIcon-1024.png` (also inside the Xcode asset catalog).
 

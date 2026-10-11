@@ -2,7 +2,7 @@
 import { chromium } from 'playwright';
 const out = process.argv[2] ?? '../raw';
 const base = process.env.BASE ?? 'http://localhost:5179';
-const states = ['onboarding-0', 'onboarding-1', 'onboarding-2', 'onboarding-3', 'connect', 'main', 'chat', 'shopping', 'settings'];
+const states = ['onboarding-0', 'onboarding-1', 'onboarding-2', 'onboarding-3', 'connect', 'main', 'chat', 'shopping', 'settings', 'tabs'];
 const statusBar = `
 <div style="position:fixed;top:0;left:0;right:0;height:54px;display:flex;align-items:center;justify-content:space-between;padding:6px 32px 0 44px;font:600 17px -apple-system,system-ui;color:#fff;z-index:99;pointer-events:none">
   <span>9:41</span>

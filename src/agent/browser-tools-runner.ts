@@ -1,9 +1,10 @@
-import * as browser from '../browser/browser-controller';
+import { type BrowserTab, defaultTab } from '../browser/browser-controller';
 import type { BrowserToolName, ToolOutput } from './types';
 
 export async function runBrowserTool(
   name: BrowserToolName,
   args: Record<string, unknown>,
+  browser: BrowserTab = defaultTab,
 ): Promise<ToolOutput> {
   switch (name) {
     case 'browser_navigate': {

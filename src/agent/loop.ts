@@ -1,4 +1,5 @@
 import type { OAuthCredentialRecord } from '../auth/types';
+import { type BrowserTab, defaultTab } from '../browser/browser-controller';
 import { refreshAccessToken } from '../auth/oauth';
 import { runBrowserTool } from './browser-tools-runner';
 import { createResponseStream } from './responses-api';
@@ -53,6 +54,7 @@ export async function runAgentTurn(
   creds: OAuthCredentialRecord,
   state: AgentLoopState,
   hooks?: AgentLoopHooks,
+  tab: BrowserTab = defaultTab,
 ): Promise<AgentTurnResult> {
   const messages = [...state.messages];
   const toolResults: ToolCallResult[] = [];
@@ -110,7 +112,7 @@ export async function runAgentTurn(
       let ok = true;
       let summary: string;
       try {
-        output = await runBrowserTool(call.name, call.arguments);
+        output = await runBrowserTool(call.name, call.arguments, tab);
         summary = typeof output === 'string' ? output.slice(0, 200) : 'Screenshot captured.';
       } catch (error) {
         ok = false;

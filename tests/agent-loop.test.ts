@@ -30,7 +30,7 @@ mock.module('@capgo/capacitor-inappbrowser', () => ({
 
 const { parseResponsesJson, createResponseStream } = await import('../src/agent/responses-api');
 const { appendUserMessage, createInitialState, runAgentTurn } = await import('../src/agent/loop');
-const browser = await import('../src/browser/browser-controller');
+const { defaultTab: browser } = await import('../src/browser/browser-controller');
 const oauth = await import('../src/auth/oauth');
 
 const creds: OAuthCredentialRecord = {
@@ -68,7 +68,7 @@ const fetchSpy = spyOn(globalThis, 'fetch');
 const requests: RequestBody[] = [];
 let responses: Response[] = [];
 beforeEach(async () => {
-  await browser.closeBrowser();
+  await browser.close();
   requests.length = 0;
   responses = [];
   for (const fn of Object.values(browserPlugin)) fn.mockClear();
@@ -80,7 +80,7 @@ beforeEach(async () => {
   }, { preconnect: () => {} }));
 });
 afterEach(async () => {
-  await browser.closeBrowser();
+  await browser.close();
 });
 afterAll(() => fetchSpy.mockRestore());
 
@@ -270,29 +270,31 @@ describe('agent loop', () => {
 
 describe('browser lifecycle', () => {
   test('navigate opens the browser, reuses it, and close clears it', async () => {
-    expect(browser.isBrowserOpen()).toBe(false);
+    expect(browser.isOpen).toBe(false);
     await browser.navigate('https://example.com');
-    expect(browser.isBrowserOpen()).toBe(true);
+    expect(browser.isOpen).toBe(true);
     expect(browserPlugin.openWebView).toHaveBeenCalledTimes(1);
     await browser.navigate('https://example.com/next');
     expect(browserPlugin.setUrl).toHaveBeenCalledWith({ url: 'https://example.com/next', id: 'webview_1' });
-    await browser.closeBrowser();
+    await browser.close();
     expect(browserPlugin.close).toHaveBeenCalledWith({ id: 'webview_1' });
-    expect(browser.isBrowserOpen()).toBe(false);
+    expect(browser.isOpen).toBe(false);
   });
 
   test('listeners are registered once and close events only clear the matching browser', async () => {
-    await browser.openBrowser('https://example.com');
+    await browser.open('https://example.com');
     const urlListener = listeners.get('urlChangeEvent');
     browserPlugin.addListener.mockClear();
-    await browser.closeBrowser();
-    await browser.openBrowser('https://example.com');
-    expect(browserPlugin.addListener).not.toHaveBeenCalled();
+    await browser.close();
+    await browser.open('https://example.com');
+    // Only per-script message listeners (e.g. title refresh) may be added; lifecycle ones are not re-registered.
+    const names = browserPlugin.addListener.mock.calls.map(([name]) => name);
+    expect(names.filter((name) => name !== 'messageFromWebview')).toEqual([]);
     expect(listeners.get('urlChangeEvent')).toBe(urlListener);
     listeners.get('closeEvent')?.({ id: 'unrelated', url: '' });
-    expect(browser.isBrowserOpen()).toBe(true);
+    expect(browser.isOpen).toBe(true);
     listeners.get('closeEvent')?.({ id: 'webview_1', url: '' });
-    expect(browser.isBrowserOpen()).toBe(false);
+    expect(browser.isOpen).toBe(false);
   });
 
   test('all page tools give a clear error while the browser is closed', async () => {
