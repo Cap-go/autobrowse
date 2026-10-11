@@ -12,3 +12,4 @@ ios/App/Pods/
 ios/App/build/
 *.local
 store/tools/node_modules
+store/asc-screenshots/
