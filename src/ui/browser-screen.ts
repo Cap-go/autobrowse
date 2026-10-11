@@ -2,6 +2,7 @@ import type { OAuthCredentialRecord } from '../auth/types';
 import { appendUserMessage, createInitialState, runAgentTurn, type AgentLoopState } from '../agent/loop';
 import { BrowserTab } from '../browser/browser-controller';
 import { isAppActive, onAppActiveChange } from '../agent/lifecycle';
+import type { DeepLinkAction } from '../deeplink';
 import { h, icon } from './dom';
 import {
   autoGrow,
@@ -39,6 +40,8 @@ interface Tab {
   pageShare: number;
   thumb?: string;
   lastText: string;
+  /** URL to open once the tab is on screen (links that arrive before render). */
+  pendingUrl?: string;
 }
 
 const SUGGESTIONS = [
@@ -218,6 +221,59 @@ export class BrowserScreen {
     this.active = this.createTab();
   }
 
+  /**
+   * Handle an autobrowse:// or capgo.app/autobrowse link: open a tab, load the
+   * page and offer the task with a one-tap Start card. Links never run on
+   * their own because the agent acts in the user's logged-in sessions.
+   */
+  handleDeepLink(link: DeepLinkAction): void {
+    const current = this.active;
+    const blank = !current.browser.url && !current.agentState && !current.busy;
+    const tab = link.tab === 'current' || blank ? current : this.createTab();
+    if (tab !== this.active && this.section) this.showTab(tab);
+    else if (tab !== this.active) this.active = tab;
+    if (link.url) this.openUrl(tab, link.url);
+    if (link.action === 'run' && link.prompt) {
+      tab.log.querySelector('.welcome')?.remove();
+      tab.log.querySelector('.link-card')?.remove();
+      tab.log.append(this.renderLinkCard(tab, link.prompt, link.url));
+      scrollToEnd(tab.log);
+    }
+  }
+
+  private renderLinkCard(tab: Tab, prompt: string, url?: string): HTMLElement {
+    const card = h(
+      'div',
+      { class: 'link-card' },
+      h('p', { class: 'link-card-label' }, icon('sparkles'), h('span', {}, 'A link wants to start this task')),
+      h('p', { class: 'link-card-prompt' }, prompt),
+      url ? h('p', { class: 'link-card-url' }, icon('globe'), h('span', {}, prettyUrl(url))) : null,
+    );
+    const start = h('button', { class: 'primary', type: 'button' }, 'Start');
+    const edit = h('button', { class: 'secondary', type: 'button' }, 'Edit');
+    const dismiss = h('button', { class: 'ghost', type: 'button' }, 'Dismiss');
+    start.addEventListener('click', () => {
+      if (!this.host.creds()) {
+        this.host.openSignIn();
+        return;
+      }
+      card.remove();
+      if (tab !== this.active) this.showTab(tab);
+      this.submit(prompt);
+    });
+    edit.addEventListener('click', () => {
+      card.remove();
+      if (tab !== this.active) this.showTab(tab);
+      this.input.value = prompt;
+      autoGrow(this.input);
+      this.syncComposer();
+      this.input.focus();
+    });
+    dismiss.addEventListener('click', () => card.remove());
+    card.append(h('div', { class: 'link-card-actions' }, start, edit, dismiss));
+    return card;
+  }
+
   get runningCount(): number {
     return this.tabs.filter((t) => t.busy).length;
   }
@@ -269,9 +325,19 @@ export class BrowserScreen {
     this.syncTabsButton();
     this.syncVisibility();
     if (!tab.log.querySelector('.welcome')) scrollToEnd(tab.log);
+    if (tab.pendingUrl) {
+      const url = tab.pendingUrl;
+      tab.pendingUrl = undefined;
+      // Wait until the section is attached so the page gets its frame.
+      requestAnimationFrame(() => this.openUrl(tab, url));
+    }
   }
 
   private openUrl(tab: Tab, url: string): void {
+    if (!this.section?.isConnected || tab !== this.active) {
+      tab.pendingUrl = url;
+      return;
+    }
     if (tab.mode === 'chat') this.setMode(tab, 'split');
     requestAnimationFrame(() => {
       this.syncFrame();

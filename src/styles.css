@@ -1932,3 +1932,58 @@ body {
   box-shadow: 0 0 0 calc(3px + var(--level, 0) * 10px) rgba(236, 236, 236, 0.22);
   transition: box-shadow 0.08s linear;
 }
+
+/* Task offered by a deep link */
+.link-card {
+  margin: 12px 0;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  background: rgba(52, 211, 153, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fade-in 0.2s ease-out;
+}
+
+.link-card p {
+  margin: 0;
+}
+
+.link-card-label,
+.link-card-url {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.link-card-label .icon,
+.link-card-url .icon {
+  width: 15px;
+  height: 15px;
+  color: var(--accent);
+}
+
+.link-card-prompt {
+  font-size: 16px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.link-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.link-card-actions .primary,
+.link-card-actions .secondary {
+  padding: 10px 18px;
+  font-size: 15px;
+}
+
+.link-card-actions .ghost {
+  margin-left: auto;
+}

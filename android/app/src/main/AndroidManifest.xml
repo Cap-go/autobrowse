@@ -23,6 +23,23 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Deep links: autobrowse://run?prompt=… (see src/deeplink.ts) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="autobrowse" />
+            </intent-filter>
+
+            <!-- https://capgo.app/autobrowse/run|open -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="capgo.app" android:pathPrefix="/autobrowse/run" />
+                <data android:scheme="https" android:host="capgo.app" android:pathPrefix="/autobrowse/open" />
+            </intent-filter>
+
         </activity>
 
         <provider

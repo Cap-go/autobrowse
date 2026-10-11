@@ -15,5 +15,10 @@ const demo = import.meta.env.DEV ? new URLSearchParams(location.search).get('dem
 if (demo) {
   void import('./ui/demo').then(({ runDemo }) => runDemo(app, demo));
 } else {
-  void app.init();
+  // Deep links: warm start (app already running) and cold start (launch URL).
+  void CapApp.addListener('appUrlOpen', ({ url }) => app.handleDeepLink(url));
+  void app.init().then(async () => {
+    const launch = await CapApp.getLaunchUrl().catch(() => undefined);
+    if (launch?.url) app.handleDeepLink(launch.url);
+  });
 }

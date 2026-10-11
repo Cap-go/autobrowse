@@ -29,6 +29,10 @@ export async function runDemo(app: App, name: string): Promise<void> {
     app.openSettings();
     return;
   }
+  if (name === 'link') {
+    app.handleDeepLink('autobrowse://run?prompt=Summarize%20the%20top%203%20stories%20in%20bullets&url=https%3A%2F%2Fnews.ycombinator.com');
+    return;
+  }
   if (name === 'tabs') {
     document.querySelector<HTMLButtonElement>('.tabs-btn')?.click();
     await new Promise((r) => setTimeout(r, 100));

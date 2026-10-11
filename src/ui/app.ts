@@ -3,6 +3,7 @@ import { completeSignIn } from '../auth/oauth';
 import { loadLatestCredentials, signOut } from '../auth/token-store';
 import type { OAuthCredentialRecord } from '../auth/types';
 import { APP_LINKS, PREF_KEYS } from '../config';
+import { parseDeepLink } from '../deeplink';
 import { BrowserScreen } from './browser-screen';
 import { h, icon } from './dom';
 import { friendlyError, openExternal, row } from './helpers';
@@ -63,6 +64,15 @@ export class App {
       this.screen = hasOnboarded() ? 'connect' : 'onboarding';
     }
     this.render();
+  }
+
+  /** Entry point for autobrowse:// and capgo.app/autobrowse links. */
+  handleDeepLink(raw: string): void {
+    const link = parseDeepLink(raw);
+    if (!link) return;
+    markOnboarded();
+    this.screenView.handleDeepLink(link);
+    if (this.screen !== 'main') this.go('main');
   }
 
   private go(screen: Screen): void {
