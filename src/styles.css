@@ -855,7 +855,7 @@ h3 {
 .main.browser-on .browser-slot {
   display: grid;
   place-items: center;
-  flex: 0 0 52%;
+  flex: 0 0 46%;
   min-height: 160px;
   background: var(--bg-2);
   color: var(--muted);
@@ -962,4 +962,125 @@ h3 {
 
 .toast.out {
   opacity: 0;
+}
+
+.send.stop {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.send.stop .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Demo-only mock pages used for store screenshots. */
+.main.browser-on .browser-slot.demo-page {
+  display: block;
+  overflow: hidden;
+  position: relative;
+  background: #fff;
+  color: #111;
+}
+
+.mock {
+  font-family: -apple-system, system-ui, sans-serif;
+  font-size: 13px;
+}
+
+.mock.news .mock-top {
+  background: #ff6600;
+  padding: 8px 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.mock.news .mock-top span {
+  font-size: 12px;
+}
+
+.mock-row {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f6f6ef;
+}
+
+.mock-row p {
+  margin: 0 0 2px;
+  font-size: 14px;
+}
+
+.mock-row small {
+  color: #828282;
+}
+
+.mock-row .n {
+  color: #828282;
+}
+
+.mock .hit {
+  outline: 3px solid #34d399;
+  outline-offset: -3px;
+  border-radius: 8px;
+}
+
+.mock.shop {
+  padding: 12px;
+}
+
+.mock-search {
+  border: 1px solid #dfe1e5;
+  border-radius: 24px;
+  padding: 10px 16px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 6px rgba(32, 33, 36, 0.18);
+}
+
+.mock-sub {
+  margin: 0 0 8px;
+  color: #5f6368;
+}
+
+.mock-card {
+  display: flex;
+  gap: 10px;
+  padding: 8px;
+  margin-bottom: 8px;
+  border: 1px solid #eee;
+  border-radius: 12px;
+}
+
+.mock-card p {
+  margin: 0;
+}
+
+.mock-card b {
+  display: block;
+  font-size: 16px;
+  margin: 2px 0;
+}
+
+.mock-card small {
+  color: #5f6368;
+}
+
+.mock-card .thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1f2937, #4b5563);
+  flex: none;
+}
+
+.mock .tap {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 999px;
+  border: 3px solid #34d399;
+  background: rgba(52, 211, 153, 0.25);
+  box-shadow: 0 0 0 8px rgba(52, 211, 153, 0.15);
 }

@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Capgo Browser</string>
+	<string>Auto Browse</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -56,9 +56,9 @@
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Capgo Browser uses the microphone so you can speak instructions to the browsing agent.</string>
+	<string>Auto Browse uses the microphone so you can speak instructions to the browsing agent.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Capgo Browser turns your voice into text so you can tell the agent what to do hands-free.</string>
+	<string>Auto Browse turns your voice into text so you can tell the agent what to do hands-free.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UIUserInterfaceStyle</key>

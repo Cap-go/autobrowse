@@ -1,6 +1,6 @@
 # Password manager and autofill
 
-Capgo Browser is meant to behave like a normal mobile browser for credentials: users should get **iOS Password AutoFill** and **Android Autofill Framework** when logging into sites inside the agent-controlled webview.
+Auto Browse is meant to behave like a normal mobile browser for credentials: users should get **iOS Password AutoFill** and **Android Autofill Framework** when logging into sites inside the agent-controlled webview.
 
 ## Architecture choice
 

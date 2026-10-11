@@ -1,4 +1,4 @@
-# Capgo Browser Support
+# Auto Browse Support
 
 Need help? Email **tori@capgo.app**. We answer within 2 business days.
 

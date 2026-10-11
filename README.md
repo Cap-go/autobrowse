@@ -1,4 +1,4 @@
-# capgo-browser
+# Auto Browse (capgo-browser)
 
 Mobile AI browser for iOS and Android (Capacitor 8). Sign in with ChatGPT, chat with an agent, and let it drive a native in-app browser on your behalf.
 

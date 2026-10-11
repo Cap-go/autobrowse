@@ -169,7 +169,7 @@ public class OAuthLoopbackPlugin extends Plugin {
             String html =
                 "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"></head>" +
                 "<body style=\"margin:0;height:100vh;display:grid;place-items:center;background:#0b0d12;color:#f4f6fb;font-family:sans-serif;text-align:center\">" +
-                "<div><h2>You're signed in</h2><p>Return to Capgo Browser.</p></div></body></html>";
+                "<div><h2>You're signed in</h2><p>Return to Auto Browse.</p></div></body></html>";
             return newFixedLengthResponse(Response.Status.OK, "text/html", html);
         }
 

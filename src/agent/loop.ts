@@ -12,6 +12,8 @@ export interface AgentLoopState {
 
 export interface AgentLoopHooks {
   onAssistantDelta?: (delta: string) => void;
+  /** Polled before each model step; return true to stop early. */
+  shouldStop?: () => boolean;
   onToolStart?: (name: string, args: Record<string, unknown>) => void;
   onToolEnd?: (name: string, ok: boolean, summary: string) => void;
   onStepStart?: (step: number) => void;
@@ -44,6 +46,9 @@ async function withFreshToken<T>(
   }
 }
 
+/** Tool-using steps per user message before the agent must answer. */
+export const MAX_TOOL_STEPS = 40;
+
 export async function runAgentTurn(
   creds: OAuthCredentialRecord,
   state: AgentLoopState,
@@ -54,10 +59,22 @@ export async function runAgentTurn(
   let assistantText = '';
   let credentials = creds;
 
-  for (let step = 1; step <= 12; step++) {
+  let budgetSpent = false;
+  for (let step = 1; step <= MAX_TOOL_STEPS + 1; step++) {
+    if (hooks?.shouldStop?.()) break;
+    // After the tool budget, ask once more with tools disabled so the user
+    // always gets an answer built from what was found.
+    const finalAnswer = step > MAX_TOOL_STEPS;
+    if (finalAnswer) {
+      budgetSpent = true;
+      messages.push({
+        role: 'developer',
+        content: 'You have used your browsing budget for this request. Answer the user now with what you found, and say what is left to check.',
+      });
+    }
     hooks?.onStepStart?.(step);
     const response = await withFreshToken(credentials, async (accessToken) => {
-      const stream = await createResponseStream({ accessToken, messages });
+      const stream = await createResponseStream({ accessToken, messages, noTools: finalAnswer });
       let parsed;
       for await (const event of stream) {
         if (event.type === 'text_delta') {
@@ -75,7 +92,7 @@ export async function runAgentTurn(
     if (turn.assistantText) {
       messages.push({ role: 'assistant', content: turn.assistantText });
     }
-    if (!turn.toolCalls.length) break;
+    if (!turn.toolCalls.length || finalAnswer) break;
 
     // Preserve every call before adding outputs, including parallel tool calls.
     for (const call of turn.toolCalls) {
@@ -104,12 +121,11 @@ export async function runAgentTurn(
       toolResults.push({ toolCallId: call.callId, output });
       hooks?.onToolEnd?.(call.name, ok, summary);
     }
-    if (step === 12) {
-      const delta = '\nReached the 12-step limit. Send a message to continue.';
-      assistantText += delta;
-      messages.push({ role: 'assistant', content: delta.trim() });
-      hooks?.onAssistantDelta?.(delta);
-    }
+  }
+  // Keep the internal budget note out of the follow-up history.
+  if (budgetSpent) {
+    const index = messages.findIndex((m) => 'role' in m && m.role === 'developer');
+    if (index >= 0) messages.splice(index, 1);
   }
 
   return { assistantText, toolResults, state: { messages } };

@@ -8,11 +8,14 @@ project(':capacitor-app').projectDir = new File('../node_modules/@capacitor/app/
 include ':capgo-capacitor-inappbrowser'
 project(':capgo-capacitor-inappbrowser').projectDir = new File('../node_modules/@capgo/capacitor-inappbrowser/android')
 
+include ':capgo-capacitor-speech-recognition'
+project(':capgo-capacitor-speech-recognition').projectDir = new File('../node_modules/@capgo/capacitor-speech-recognition/android')
+
 include ':capgo-native-navigation'
 project(':capgo-native-navigation').projectDir = new File('../node_modules/@capgo/native-navigation/android')
 
-include ':capacitor-secure-storage-plugin'
-project(':capacitor-secure-storage-plugin').projectDir = new File('../node_modules/capacitor-secure-storage-plugin/android')
-
 include ':capgo-oauth-loopback'
 project(':capgo-oauth-loopback').projectDir = new File('../node_modules/@capgo/oauth-loopback/android')
+
+include ':capacitor-secure-storage-plugin'
+project(':capacitor-secure-storage-plugin').projectDir = new File('../node_modules/capacitor-secure-storage-plugin/android')

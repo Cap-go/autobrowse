@@ -1,4 +1,4 @@
-# App Store Connect metadata — Capgo Browser (iOS)
+# App Store Connect metadata — Auto Browse (iOS)
 
 Copy/paste source for App Store Connect. Character limits noted.
 
@@ -6,7 +6,7 @@ Copy/paste source for App Store Connect. Character limits noted.
 
 | Field | Value |
 | --- | --- |
-| Name (30) | Capgo Browser |
+| Name (30) | Auto Browse |
 | Subtitle (30) | AI agent that browses for you |
 | Apple ID | 6821215230 |
 | Bundle ID | app.capgo.browser |
@@ -32,11 +32,11 @@ Uses existing Capgo pages. `store/legal/*.md` holds app-specific drafts if dedic
 
 ## Promotional text (170)
 
-Tell it what you need. Capgo Browser opens websites, reads them and gets things done while you watch. Runs on your own ChatGPT plan.
+Tell it what you need. Auto Browse opens websites, reads them and gets things done while you watch. Runs on your own ChatGPT plan.
 
 ## Description (4000)
 
-Capgo Browser is a web browser with an AI agent built in. Type what you want in plain words and the agent opens pages, reads them, scrolls, clicks and types for you, in a real browser you can see.
+Auto Browse is a web browser with an AI agent built in. Type what you want in plain words and the agent opens pages, reads them, scrolls, clicks and types for you, in a real browser you can see.
 
 ASK, DON'T SEARCH
 • "Summarize the top stories on Hacker News."
@@ -44,8 +44,14 @@ ASK, DON'T SEARCH
 • "Find 3 well rated cafés near the Louvre."
 The agent does the browsing and gives you a short answer.
 
-WATCH EVERY STEP
-Each action shows up live: opening a page, reading it, clicking, typing. The browser is yours, take over at any moment.
+WATCH IT WORK
+The page opens right above the chat, so you see every step live: searching, reading, tapping, typing. Expand the page, or close it and take over at any moment.
+
+JUST SAY IT
+Tap the mic and speak. Your words appear as you talk and the agent starts when you stop.
+
+TALK TO ANY PAGE
+Open a website and ask about it: "summarize this", "find the cheapest one", "what are the opening hours?".
 
 YOU STAY IN CONTROL
 The agent asks before anything important like buying, posting, sending a message or changing an account.
@@ -59,16 +65,16 @@ PRIVATE BY DESIGN
 • Clear the browser session and sign out anytime from Settings.
 
 WORKS WITHOUT SIGNING IN
-Use Capgo Browser as a simple, fast browser. Sign in only when you want the agent.
+Use Auto Browse as a simple, fast browser. Sign in only when you want the agent.
 
-Capgo Browser is made by Capgo. It is not affiliated with or endorsed by OpenAI. ChatGPT is a trademark of OpenAI.
+Auto Browse is made by Capgo. It is not affiliated with or endorsed by OpenAI. ChatGPT is a trademark of OpenAI.
 
 Terms of Use: https://capgo.app/tos/
 Privacy Policy: https://capgo.app/privacy/
 
 ## Keywords (100, comma separated, no spaces)
 
-ai,agent,browser,chatgpt,assistant,automation,web,summarize,research,shopping,compare,gpt,autopilot
+ai,agent,browser,chatgpt,assistant,automation,voice,summarize,research,shopping,compare,gpt,autopilot
 
 (99 characters)
 
@@ -123,7 +129,7 @@ Rationale: prompts and page content are transmitted off device to OpenAI (Respon
 ### Notes for the reviewer
 
 ```
-Capgo Browser is a WebKit browser with an optional AI agent.
+Auto Browse is a WebKit browser with an optional AI agent.
 
 1. Without signing in: tap "Browse without signing in". You can type any
    address in "Search or enter website" or tap Google / Wikipedia / Hacker News.

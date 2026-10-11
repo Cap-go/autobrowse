@@ -8,7 +8,7 @@ export type BrowserToolName =
   | 'browser_extract';
 
 export interface AgentMessage {
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'developer';
   content: string;
 }
 

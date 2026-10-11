@@ -1,5 +1,5 @@
 /** Display name sent on first dynamic registration (agent_name_hint). */
-export const AGENT_NAME_HINT = 'Capgo Browser';
+export const AGENT_NAME_HINT = 'Auto Browse';
 
 export const OAUTH_AUTHORIZE_URL = 'https://auth.openai.com/api/accounts/authorize';
 export const OAUTH_TOKEN_URL = 'https://auth.openai.com/api/accounts/oauth/token';

@@ -11,9 +11,10 @@ apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
 dependencies {
     implementation project(':capacitor-app')
     implementation project(':capgo-capacitor-inappbrowser')
+    implementation project(':capgo-capacitor-speech-recognition')
     implementation project(':capgo-native-navigation')
-    implementation project(':capacitor-secure-storage-plugin')
     implementation project(':capgo-oauth-loopback')
+    implementation project(':capacitor-secure-storage-plugin')
 
 }
 

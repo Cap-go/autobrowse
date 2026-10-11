@@ -193,7 +193,7 @@ describe('agent loop', () => {
     for (const request of requests) {
       expect(request.store).toBe(false);
       expect(request).not.toHaveProperty('previous_response_id');
-      expect(request.instructions).toContain('Capgo Browser');
+      expect(request.instructions).toContain('Auto Browse');
       expect(request.instructions).toContain('Ask the user');
     }
   });
@@ -247,13 +247,24 @@ describe('agent loop', () => {
     }
   });
 
-  test('stops at 12 model steps while preserving every tool output', async () => {
-    responses.push(...Array.from({ length: 12 }, (_, i) => sse([completed([call(String(i))])])));
-    const result = await runAgentTurn(creds, createInitialState('Keep browsing'));
-    expect(requests).toHaveLength(12);
-    expect(result.toolResults).toHaveLength(12);
-    expect(result.state.messages.filter((item) => 'type' in item && item.type === 'function_call_output')).toHaveLength(12);
-    expect(result.assistantText).toContain('12-step limit');
+  test('after the tool budget asks once more without tools and returns that answer', async () => {
+    const { MAX_TOOL_STEPS } = await import('../src/agent/loop');
+    responses.push(...Array.from({ length: MAX_TOOL_STEPS }, (_, i) => sse([completed([call(String(i))])])));
+    responses.push(sse([completed([message('Here is what I found.')])]));
+    const result = await runAgentTurn(creds, createInitialState('Loop'));
+    expect(requests).toHaveLength(MAX_TOOL_STEPS + 1);
+    expect((requests.at(-1) as unknown as { tool_choice?: string }).tool_choice).toBe('none');
+    expect(result.toolResults).toHaveLength(MAX_TOOL_STEPS);
+    expect(result.assistantText).toContain('Here is what I found.');
+    expect(result.state.messages.some((m) => 'role' in m && m.role === 'developer')).toBe(false);
+  });
+
+  test('shouldStop ends the turn before the next model step', async () => {
+    responses.push(sse([completed([call('a')])]), sse([completed([message('never')])]));
+    let calls = 0;
+    const result = await runAgentTurn(creds, createInitialState('Stop'), { shouldStop: () => ++calls > 1 });
+    expect(requests).toHaveLength(1);
+    expect(result.assistantText).not.toContain('never');
   });
 });
 

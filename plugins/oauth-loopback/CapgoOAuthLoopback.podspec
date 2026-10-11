@@ -5,7 +5,7 @@ package = JSON.parse(File.read(File.join(__dir__, 'package.json')))
 Pod::Spec.new do |s|
   s.name = 'CapgoOAuthLoopback'
   s.version = package['version']
-  s.summary = 'Loopback OAuth callback listener for Capgo Browser'
+  s.summary = 'Loopback OAuth callback listener for Auto Browse'
   s.license = 'MIT'
   s.homepage = 'https://github.com/Cap-go/capgo-browser'
   s.author = 'Capgo'

@@ -7,6 +7,8 @@ import type { AgentConversationItem, ToolCallRequest } from './types';
 export interface ResponsesApiOptions {
   accessToken: string;
   messages: AgentConversationItem[];
+  /** Force a plain answer (no tool calls), used when the step budget is spent. */
+  noTools?: boolean;
 }
 
 export interface ParsedAssistantTurn {
@@ -20,7 +22,7 @@ export type StreamEvent =
   | { type: 'completed'; parsed: ParsedAssistantTurn };
 
 const INSTRUCTIONS = [
-  'You are Capgo Browser, a browsing agent on the user\'s phone. The user watches the browser while you work.',
+  'You are Auto Browse, a browsing agent on the user\'s phone. The user watches the browser while you work.',
   'Always act in the browser with your tools instead of answering from memory: open a relevant page',
   '(for searches use https://www.google.com/search?q=...), then call browser_read_dom to read text and',
   'get clickable elements with their x/y centers. Tap using those coordinates. Re-read after each navigation.',
@@ -58,6 +60,7 @@ export async function createResponseStream(
     input: options.messages,
     instructions: INSTRUCTIONS,
     tools: [BROWSER_TOOL_NAMESPACE],
+    ...(options.noTools ? { tool_choice: 'none' } : {}),
     stream: true,
     store: false,
   });

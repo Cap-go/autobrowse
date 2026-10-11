@@ -211,7 +211,7 @@ export class App {
         'div',
         { class: 'connect-hero' },
         icon('logo', 'app-logo'),
-        h('h1', {}, 'Capgo Browser'),
+        h('h1', {}, 'Auto Browse'),
         h('p', { class: 'lede' }, 'Sign in with your ChatGPT account. The agent runs on your own ChatGPT plan.'),
       ),
       h(
@@ -234,7 +234,7 @@ export class App {
           link('Terms', APP_LINKS.terms),
           ' and ',
           link('Privacy Policy', APP_LINKS.privacy),
-          '. Capgo Browser is not affiliated with OpenAI.',
+          '. Auto Browse is not affiliated with OpenAI.',
         ),
       ),
     );
@@ -308,7 +308,7 @@ export class App {
     );
     const urlTimer = window.setInterval(() => {
       const url = currentUrl();
-      pageLabel.textContent = url ? prettyUrl(url) : 'Browser';
+      if (url) pageLabel.textContent = prettyUrl(url);
     }, 500);
     cleanups.push(() => window.clearInterval(urlTimer));
 
@@ -328,8 +328,13 @@ export class App {
     });
     log.append(empty);
 
+    let stopRequested = false;
     const syncSend = (): void => {
-      send.disabled = this.busy || !input.value.trim();
+      // While the agent works the send button becomes Stop.
+      send.disabled = !this.busy && !input.value.trim();
+      send.classList.toggle('stop', this.busy);
+      send.replaceChildren(icon(this.busy ? 'stop' : 'send'));
+      send.setAttribute('aria-label', this.busy ? 'Stop' : 'Send');
     };
     input.addEventListener('input', () => {
       autoGrow(input);
@@ -389,12 +394,18 @@ export class App {
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (this.busy) {
+        stopRequested = true;
+        send.disabled = true;
+        return;
+      }
       const text = input.value.trim();
-      if (!text || this.busy) return;
+      if (!text) return;
       if (!this.creds) {
         this.openSignInSheet();
         return;
       }
+      stopRequested = false;
       empty.remove();
       input.value = '';
       autoGrow(input);
@@ -426,6 +437,7 @@ export class App {
           ? appendUserMessage(this.agentState, modelText)
           : createInitialState(modelText);
         const result = await runAgentTurn(this.creds, state, {
+          shouldStop: () => stopRequested,
           onAssistantDelta: (delta) => {
             ensureBubble().textContent += delta;
             scrollToEnd(log);
@@ -441,7 +453,8 @@ export class App {
         });
         this.agentState = result.state;
         if (!pending || !(pending as HTMLElement).textContent) {
-          ensureBubble().textContent = result.assistantText || 'Done.';
+          ensureBubble().textContent =
+            result.assistantText || (stopRequested ? 'Stopped.' : 'Done.');
         }
       } catch (error) {
         const err = bubble('assistant', friendlyError(error));
@@ -460,7 +473,7 @@ export class App {
     const header = h(
       'header',
       { class: 'appbar' },
-      h('div', { class: 'appbar-title' }, icon('logo', 'mini-logo'), h('span', {}, 'Capgo Browser')),
+      h('div', { class: 'appbar-title' }, icon('logo', 'mini-logo'), h('span', {}, 'Auto Browse')),
       h(
         'div',
         { class: 'appbar-actions' },
@@ -715,7 +728,7 @@ export class App {
       );
     }
 
-    rows.append(h('p', { class: 'fine center' }, `Capgo Browser ${APP_VERSION} · Not affiliated with OpenAI`));
+    rows.append(h('p', { class: 'fine center' }, `Auto Browse ${APP_VERSION} · Not affiliated with OpenAI`));
     close = this.openSheet('Settings', h('div', { class: 'sheet-body' }, rows));
   }
 }

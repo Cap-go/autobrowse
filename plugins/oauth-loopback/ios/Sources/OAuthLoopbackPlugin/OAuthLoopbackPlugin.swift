@@ -196,7 +196,7 @@ private final class LoopbackSession {
     private static let donePage = """
     <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
     <style>body{margin:0;height:100vh;display:grid;place-items:center;background:#0b0d12;color:#f4f6fb;font:17px -apple-system,system-ui,sans-serif;text-align:center}p{color:#98a1b3}</style>
-    </head><body><div><h2>You're signed in</h2><p>You can close this window and return to Capgo Browser.</p></div></body></html>
+    </head><body><div><h2>You're signed in</h2><p>You can close this window and return to Auto Browse.</p></div></body></html>
     """
 
     private static func respond(_ connection: NWConnection, status: String, headers: [String], body: String) {

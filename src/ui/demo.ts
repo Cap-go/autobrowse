@@ -68,7 +68,54 @@ export async function runDemo(app: App, name: string): Promise<void> {
       );
     }
     log.append(activity, h('div', { class: 'bubble assistant' }, script.answer));
+    // Mock page in the browser area (the real app overlays the native browser here).
+    const section = document.querySelector('.screen.main');
+    const slot = document.querySelector('.browser-slot');
+    const label = document.querySelector('.page-label');
+    if (section && slot && label) {
+      section.classList.add('browser-on');
+      slot.classList.add('loaded', 'demo-page');
+      label.textContent = name === 'chat' ? 'news.ycombinator.com' : 'google.com/search';
+      slot.replaceChildren(name === 'chat' ? mockNews() : mockShopping());
+    }
     const input = document.querySelector('textarea');
     if (input) input.placeholder = 'Ask a follow up…';
   }
+}
+
+function mockNews(): HTMLElement {
+  const items = [
+    'A new open source browser engine written in Rust hits 1.0',
+    'Why SQLite is quietly running your phone',
+    'Show HN: a tiny CSS framework with zero classes',
+    'The hidden cost of always-on notifications',
+    'How we cut our cloud bill in half',
+  ];
+  return h(
+    'div',
+    { class: 'mock news' },
+    h('div', { class: 'mock-top' }, h('b', {}, 'Hacker News'), h('span', {}, 'new | past | ask | show')),
+    ...items.map((t, i) =>
+      h('div', { class: `mock-row${i === 0 ? ' hit' : ''}` }, h('span', { class: 'n' }, `${i + 1}.`), h('div', {}, h('p', {}, t), h('small', {}, `${320 - i * 47} points · ${90 - i * 13} comments`))),
+    ),
+    h('div', { class: 'tap', style: 'left:58%;top:15%' }),
+  );
+}
+
+function mockShopping(): HTMLElement {
+  const rows = [
+    ['Tech Depot', '$279', 'Free delivery'],
+    ['MegaMart', '$289', 'Pickup today'],
+    ['PixelShop', '$299', 'In stock'],
+  ];
+  return h(
+    'div',
+    { class: 'mock shop' },
+    h('div', { class: 'mock-search' }, '27 inch 4K monitor'),
+    h('p', { class: 'mock-sub' }, 'Shopping results'),
+    ...rows.map(([store, price, note], i) =>
+      h('div', { class: `mock-card${i === 0 ? ' hit' : ''}` }, h('div', { class: 'thumb' }), h('div', {}, h('p', {}, '27" 4K UHD IPS Monitor'), h('b', {}, String(price)), h('small', {}, `${store} · ${note}`))),
+    ),
+    h('div', { class: 'tap', style: 'left:70%;top:27%' }),
+  );
 }

@@ -1,8 +1,8 @@
-# Capgo Browser Privacy Policy
+# Auto Browse Privacy Policy
 
 Last updated: October 10, 2026
 
-Capgo Browser ("the app") is made by Digital shift OU, operating Capgo ("we"). This policy explains what happens to your data when you use the app.
+Auto Browse ("the app") is made by Digital shift OU, operating Capgo ("we"). This policy explains what happens to your data when you use the app.
 
 ## Summary
 
