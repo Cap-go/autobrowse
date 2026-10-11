@@ -74,9 +74,9 @@ Privacy Policy: https://capgo.app/privacy/
 
 ## Keywords (100, comma separated, no spaces)
 
-ai,agent,browser,chatgpt,assistant,automation,voice,summarize,research,shopping,compare,gpt,autopilot
+ai,agent,browser,chatgpt,assistant,automation,voice,summarize,research,shopping,compare,autopilot
 
-(99 characters)
+(97 characters)
 
 ## What's New (first version)
 
