@@ -3,6 +3,7 @@ import { chromium } from 'playwright';
 import { readFileSync, mkdirSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
+const android = process.argv.includes('--android');
 const shots = [
   { raw: 'chat', kicker: 'AI BROWSING AGENT', title: 'Ask it.<br/>It browses for you.' },
   { raw: 'shopping', kicker: 'SAVE TIME', title: 'Compare prices<br/>in seconds.' },
@@ -12,7 +13,7 @@ const shots = [
   { raw: 'connect', kicker: 'PRIVATE', title: 'Runs on your<br/>ChatGPT plan.' },
 ];
 
-const sizes = [
+const sizes = android ? [{ dir: 'android-phone', w: 1080, h: 2160 }] : [
   { dir: 'iphone-6.9', w: 1320, h: 2868 },
   { dir: 'iphone-6.5', w: 1284, h: 2778 },
 ];
@@ -29,26 +30,35 @@ const html = (img, s) => `<!doctype html><html><head><style>
   .screen{width:100%;height:100%;border-radius:48px;overflow:hidden;position:relative;background:#0b0d12}
   .screen img{width:100%;display:block}
   .island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:100px;height:30px;border-radius:20px;background:#000;z-index:2}
+${android ? `
+  html,body{width:360px;height:720px}
+  .copy{top:38px;padding:0 20px}
+  .k{font-size:11px}
+  h1{font-size:32px}
+  .phone{top:176px;width:276px;height:536px;padding:8px;border-radius:22px;box-shadow:none}
+  .screen{border-radius:14px}
+  .island{display:none}
+` : ''}
 </style></head><body>
   <div class="copy"><div class="k">${s.kicker}</div><h1>${s.title}</h1></div>
   <div class="phone"><div class="screen"><div class="island"></div><img src="data:image/png;base64,${img}"/></div></div>
 </body></html>`;
 
-const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 440, height: 956 }, deviceScaleFactor: 3 });
+const browser = await chromium.launch({ headless: true });
+const page = await browser.newPage({ viewport: { width: android ? 360 : 440, height: android ? 720 : 956 }, deviceScaleFactor: 3 });
 for (const size of sizes) {
   rmSync(`../screenshots/${size.dir}`, { recursive: true, force: true });
   mkdirSync(`../screenshots/${size.dir}`, { recursive: true });
 }
 let i = 1;
 for (const s of shots) {
-  const img = readFileSync(`../raw/${s.raw}.png`).toString('base64');
+  const img = readFileSync(`../raw/${android ? 'android/' : ''}${s.raw}.png`).toString('base64');
   await page.setContent(html(img, s));
   await page.waitForTimeout(200);
-  const master = `../screenshots/iphone-6.9/${String(i).padStart(2, '0')}-${s.raw}.png`;
+  const master = `../screenshots/${android ? 'android-phone' : 'iphone-6.9'}/${String(i).padStart(2, '0')}-${s.raw}.png`;
   await page.screenshot({ path: master });
   // 6.5" variant: resize + center crop, strip alpha (App Store rejects alpha).
-  execFileSync('magick', [master, '-resize', '1284x2790^', '-gravity', 'center', '-extent', '1284x2778', '-alpha', 'off', master.replace('iphone-6.9', 'iphone-6.5')]);
+  if (!android) execFileSync('magick', [master, '-resize', '1284x2790^', '-gravity', 'center', '-extent', '1284x2778', '-alpha', 'off', master.replace('iphone-6.9', 'iphone-6.5')]);
   execFileSync('magick', [master, '-alpha', 'off', master]);
   i += 1;
 }

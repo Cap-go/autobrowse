@@ -1,6 +1,9 @@
 // Capture raw app states from the Vite dev server (bun run dev): bun shoot-raw.mjs [outDir]
 import { chromium } from 'playwright';
-const out = process.argv[2] ?? '../raw';
+import { mkdirSync } from 'node:fs';
+const android = process.argv.includes('--android');
+const out = process.argv.slice(2).find((arg) => !arg.startsWith('--')) ?? (android ? '../raw/android' : '../raw');
+mkdirSync(out, { recursive: true });
 const base = process.env.BASE ?? 'http://localhost:5179';
 const states = ['onboarding-0', 'onboarding-1', 'onboarding-2', 'onboarding-3', 'connect', 'main', 'chat', 'shopping', 'settings', 'tabs'];
 const statusBar = `
@@ -12,18 +15,20 @@ const statusBar = `
     <svg width="27" height="13" viewBox="0 0 27 13"><rect x=".5" y=".5" width="23" height="12" rx="3.5" fill="none" stroke="#fff" opacity=".4"/><rect x="2" y="2" width="20" height="9" rx="2" fill="#fff"/><rect x="25" y="4.5" width="1.5" height="4" rx=".75" fill="#fff" opacity=".4"/></svg>
   </span>
 </div>`;
-const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 393, height: 852 }, deviceScaleFactor: 3, colorScheme: 'dark', hasTouch: true, isMobile: true });
+const browser = await chromium.launch({ headless: true });
+const ctx = await browser.newContext({ viewport: { width: 393, height: android ? 786 : 852 }, deviceScaleFactor: 3, colorScheme: 'dark', hasTouch: true, isMobile: true });
 for (const s of states) {
   const page = await ctx.newPage();
   await page.goto(`${base}/?demo=${s}`);
   await page.waitForTimeout(700);
-  await page.evaluate((bar) => {
+  await page.evaluate(({ bar, android }) => {
     const st = document.createElement('style');
-    st.textContent = ':root{--safe-top:54px !important;--safe-bottom:30px !important}';
+    st.textContent = android
+      ? ':root{--safe-top:0px !important;--safe-bottom:0px !important}*{box-shadow:none !important}'
+      : ':root{--safe-top:54px !important;--safe-bottom:30px !important}';
     document.head.append(st);
-    document.body.insertAdjacentHTML('beforeend', bar);
-  }, statusBar);
+    if (!android) document.body.insertAdjacentHTML('beforeend', bar);
+  }, { bar: statusBar, android });
   await page.waitForTimeout(500);
   await page.screenshot({ path: `${out}/${s}.png` });
   await page.close();

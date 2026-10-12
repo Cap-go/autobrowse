@@ -16,6 +16,7 @@ Mobile AI browser for iOS and Android (Capacitor 8). Sign in with ChatGPT, chat 
 - [OAuth loopback spike](docs/oauth-spike.md) (mobile redirect risks and fallbacks)
 - [Autofill notes](docs/autofill.md) (password managers in the webview)
 - [Deep links](docs/deeplinks.md) (`autobrowse://run?prompt=…`, universal links on capgo.app)
+- [Android release](store/android/README.md) (SDK/JDK, upload signing, Play assets and emulator verification)
 
 ## Requirements
 
