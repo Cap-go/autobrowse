@@ -614,6 +614,12 @@ export class BrowserScreen {
       autoGrow(this.input);
       this.syncComposer();
     });
+    // Tapping the collapsed pill reopens the chat one level (split view).
+    const expandFromPill = (): void => {
+      if (this.active.mode === 'page') this.setMode(this.active, 'split');
+    };
+    this.input.addEventListener('focus', expandFromPill);
+    form.addEventListener('click', expandFromPill);
     this.input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
         e.preventDefault();
