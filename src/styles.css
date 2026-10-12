@@ -2531,3 +2531,23 @@ body {
   background: #fff;
   color: #111;
 }
+
+/* Page-only mode: just the composer pill floats under the page. */
+.screen.browser.mode-page .divider,
+.screen.browser.mode-page .pills {
+  display: none;
+}
+
+.screen.browser.mode-page .chat-area,
+.screen.browser.mode-page .composer-wrap {
+  background: var(--page-gutter);
+}
+
+.screen.browser.mode-page .composer-wrap {
+  padding-top: 8px;
+}
+
+.screen.browser.mode-page .composer {
+  background: var(--chat-surface);
+  border-color: rgba(255, 255, 255, 0.16);
+}

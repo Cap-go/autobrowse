@@ -214,7 +214,7 @@ export class BrowserScreen {
       { class: 'chat-area' },
       h('div', { class: 'pills' }, this.showPagePill, this.showChatPill),
       this.chatHost,
-      h('footer', { class: 'composer-wrap' }, form),
+      this.bindPillSwipe(h('footer', { class: 'composer-wrap' }, form)),
     );
 
     section.append(bar, this.progress, this.pageArea, divider, chat);
@@ -434,6 +434,20 @@ export class BrowserScreen {
     for (const tab of this.tabs) {
       void tab.browser.setVisible(tab === this.active && showActive);
     }
+  }
+
+  /** In page-only mode the composer is a lone pill: swipe it up to bring the chat back. */
+  private bindPillSwipe(footer: HTMLElement): HTMLElement {
+    let startY = 0;
+    footer.addEventListener('touchstart', (e) => {
+      startY = e.touches[0]?.clientY ?? 0;
+    }, { passive: true });
+    footer.addEventListener('touchend', (e) => {
+      if (this.active.mode !== 'page') return;
+      const dy = (e.changedTouches[0]?.clientY ?? 0) - startY;
+      if (dy < -30) this.setMode(this.active, 'split');
+    });
+    return footer;
   }
 
   private bindDivider(divider: HTMLElement): void {
@@ -692,7 +706,8 @@ export class BrowserScreen {
     }
     const tab = this.active;
     if (tab.busy) return;
-    if (tab.mode === 'chat') this.setMode(tab, 'split');
+    // Show the conversation so the reply is visible (also from the collapsed pill).
+    if (tab.mode !== 'split') this.setMode(tab, 'split');
     // The page must have a frame before the agent opens it.
     this.syncFrame();
     void this.runTurn(tab, creds, text);
