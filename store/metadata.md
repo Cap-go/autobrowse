@@ -127,7 +127,7 @@ Rationale: prompts and page content are transmitted off device to OpenAI (Respon
 | Field | Value |
 | --- | --- |
 | Contact | Same contact as the team's other apps in App Store Connect |
-| Sign-in required | No (browser works without sign in; agent uses reviewer's ChatGPT) |
+| Sign-in required | Yes: demo ChatGPT account review@capgo.app (password stored only in App Store Connect) |
 
 ### Notes for the reviewer
 
@@ -144,10 +144,8 @@ Auto Browse is a WebKit browser with an optional AI agent.
    agent opens the page in the browser and replies in the chat. Each step is
    shown as a chip ("Opening...", "Reading the page").
 
-The AI agent uses the reviewer's own ChatGPT account through OpenAI's
-official Sign in with ChatGPT (a free ChatGPT account works). If you need a
-dedicated test account, contact tori@capgo.app and we will provide one
-within 24h.
+To test the AI agent, tap "Continue with ChatGPT" and sign in with the demo
+ChatGPT account provided in the Sign-In Information fields (no 2FA).
 
 - Sign out and data clearing: Settings (gear icon) > Sign out /
   "Close browser and clear session". No account is created by this app, so
