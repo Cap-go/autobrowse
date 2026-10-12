@@ -113,6 +113,8 @@ export class BrowserTab {
   url: string | null = null;
   title = '';
   loading = false;
+  /** Whether the page has history to go back to (refreshed after each load). */
+  canGoBack = false;
   private frame: BrowserFrame | null = null;
   private visible = true;
   private loadWaiters: Array<() => void> = [];
@@ -135,17 +137,21 @@ export class BrowserTab {
   handleUrl(url: string): void {
     this.url = url;
     this.emit();
+    // Single-page apps change URL without a full load.
+    setTimeout(() => void this.refreshCanGoBack(), 600);
   }
 
   handleLoaded(): void {
     this.loading = false;
     this.injectLinkGuard();
+    void this.refreshCanGoBack();
     for (const waiter of [...this.loadWaiters]) waiter();
     void this.refreshTitle();
     this.emit();
   }
 
   handleClosed(): void {
+    this.canGoBack = false;
     if (this.webViewId) tabsByWebView.delete(this.webViewId);
     this.webViewId = undefined;
     this.loading = false;
@@ -168,6 +174,22 @@ export class BrowserTab {
       const timer = setTimeout(done, timeoutMs);
       this.loadWaiters.push(done);
     });
+  }
+
+  private async refreshCanGoBack(): Promise<void> {
+    if (!this.webViewId) return;
+    try {
+      const can = await this.runScriptReturning<boolean>(
+        '(window.navigation && typeof navigation.canGoBack === "boolean") ? navigation.canGoBack : history.length > 1',
+        3_000,
+      );
+      if (can !== this.canGoBack) {
+        this.canGoBack = can;
+        this.emit();
+      }
+    } catch {
+      /* keep previous value */
+    }
   }
 
   /** Install the app-link guard in the current document (idempotent). */

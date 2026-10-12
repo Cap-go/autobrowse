@@ -122,8 +122,6 @@ export async function runDemo(app: App, name: string): Promise<void> {
     log.append(h('div', { class: 'turn' }, h('div', { class: 'msg user' }, script.user), steps, answer));
     const input = document.querySelector('textarea');
     if (input) input.placeholder = 'Ask about this page or say what to do…';
-    const status = document.querySelector('.agent-status');
-    if (status) status.textContent = name === 'chat' ? 'Hacker News' : '27 inch 4K monitor - Google Search';
   }
 }
 

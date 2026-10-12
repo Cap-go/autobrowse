@@ -2433,3 +2433,101 @@ body {
 .slides-viewport {
   touch-action: pan-y;
 }
+
+/* =========================================================
+   Clear separation between the web page and the chat
+   (the page is a native layer: blur/shadows can't overlay it,
+   so contrast + a rounded sheet edge do the job)
+   ========================================================= */
+
+:root {
+  --chat-surface: #262626;
+  --page-gutter: #0e0e0e;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --chat-surface: #ffffff;
+    --page-gutter: #d9d9d9;
+  }
+}
+
+.screen.browser {
+  background: var(--page-gutter);
+}
+
+.screen.browser .addressbar,
+.screen.browser .progress {
+  background: var(--bg);
+}
+
+.screen.browser .page-area {
+  background: var(--page-gutter);
+}
+
+.screen.browser .divider {
+  height: 22px;
+  padding-top: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 18px 18px 0 0;
+  background: var(--chat-surface);
+}
+
+@media (prefers-color-scheme: light) {
+  .screen.browser .divider {
+    border-top-color: rgba(0, 0, 0, 0.14);
+  }
+}
+
+.screen.browser .grabber {
+  top: 8px;
+  width: 40px;
+  height: 5px;
+  margin-left: -20px;
+  background: var(--faint);
+}
+
+.screen.browser .agent-status {
+  margin-top: 18px;
+}
+
+.screen.browser .agent-status[hidden] {
+  display: none;
+}
+
+.screen.browser .chat-area,
+.screen.browser .composer-wrap {
+  background: var(--chat-surface);
+}
+
+.screen.browser .composer {
+  background: var(--bg);
+}
+
+/* Chat-only mode: the sheet fills the space, keep its rounded edge. */
+.screen.browser.mode-chat .divider {
+  border-radius: 0;
+}
+
+/* Back button: obviously inactive when there is nothing to go back to. */
+.addressbar .icon-btn:disabled {
+  opacity: 0.3;
+}
+
+/* Tab grid opens instantly with a short, light animation. */
+.tabs-overlay {
+  animation: tabs-in 0.16s ease-out;
+}
+
+@keyframes tabs-in {
+  from {
+    opacity: 0;
+    transform: scale(1.03);
+  }
+}
+
+/* Demo-only mock pages keep a white page background. */
+.screen.browser .page-area.demo-page {
+  background: #fff;
+  color: #111;
+}

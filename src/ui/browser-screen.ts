@@ -172,7 +172,7 @@ export class BrowserScreen {
     });
 
     this.tabsBtn = h('button', { class: 'tabs-btn', type: 'button', 'aria-label': 'Tabs' });
-    this.tabsBtn.addEventListener('click', () => void this.openTabSwitcher());
+    this.tabsBtn.addEventListener('click', () => this.openTabSwitcher());
     const menuBtn = h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Menu' }, icon('more'));
     menuBtn.addEventListener('click', () => this.openMenu());
 
@@ -333,12 +333,28 @@ export class BrowserScreen {
       pageShare: 0.55,
       lastText: '',
     };
-    tab.browser.onChange(() => {
+    let thumbTimer: ReturnType<typeof setTimeout> | undefined;
+    tab.browser.onChange((b) => {
       if (tab === this.active) this.syncChrome();
       this.syncTabsButton();
+      // Keep a fresh thumbnail for the tab grid, captured off the critical path.
+      if (b.isOpen && !b.loading) {
+        clearTimeout(thumbTimer);
+        thumbTimer = setTimeout(() => void this.captureThumb(tab), 900);
+      }
     });
     this.tabs.push(tab);
     return tab;
+  }
+
+  private async captureThumb(tab: Tab): Promise<void> {
+    if (tab !== this.active || tab.mode === 'chat' || this.overlayOpen || !tab.browser.isOpen) return;
+    try {
+      const shot = await tab.browser.takeScreenshot();
+      tab.thumb = shot.startsWith('data:') ? shot : `data:image/jpeg;base64,${shot}`;
+    } catch {
+      /* keep previous thumbnail */
+    }
   }
 
   private newTab(): void {
@@ -487,6 +503,7 @@ export class BrowserScreen {
       this.address.value = b.url ? prettyUrl(b.url) : '';
     }
     this.backBtn.hidden = !hasPage;
+    this.backBtn.disabled = !b.canGoBack;
     this.reloadBtn.hidden = !b.isOpen;
     this.syncStatus();
   }
@@ -496,11 +513,8 @@ export class BrowserScreen {
     this.status.replaceChildren();
     if (tab.busy && !isAppActive()) {
       this.status.append(h('span', {}, 'Paused · continues when you are back'));
-    } else if (tab.browser.isOpen) {
-      this.status.append(h('span', {}, tab.browser.title || prettyUrl(tab.browser.url ?? '')));
-    } else {
-      this.status.append(h('span', {}, 'Chat'));
     }
+    this.status.hidden = !this.status.childElementCount;
   }
 
   private syncTabsButton(): void {
@@ -936,17 +950,7 @@ export class BrowserScreen {
     close = this.host.openSheet('Menu', h('div', { class: 'sheet-body' }, rows));
   }
 
-  private async openTabSwitcher(): Promise<void> {
-    // Thumbnail of the visible tab before hiding the native pages.
-    const current = this.active;
-    if (current.browser.isOpen && current.mode !== 'chat') {
-      try {
-        const shot = await current.browser.takeScreenshot();
-        current.thumb = shot.startsWith('data:') ? shot : `data:image/png;base64,${shot}`;
-      } catch {
-        /* keep previous thumbnail */
-      }
-    }
+  private openTabSwitcher(): void {
     this.overlayOpen = true;
     this.syncVisibility();
 
