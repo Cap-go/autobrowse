@@ -29,6 +29,15 @@ export async function runDemo(app: App, name: string): Promise<void> {
     await app.openSettings();
     return;
   }
+  if (name === 'pill-busy') {
+    // Collapsed chat while the agent works (store screenshot / visual check).
+    const screen = (app as unknown as { screenView: { active: Record<string, unknown>; setMode: (t: unknown, m: string) => void; syncPill: () => void } }).screenView;
+    screen.setMode(screen.active, 'page');
+    screen.active.busy = true;
+    screen.active.liveStatus = 'Reading the page';
+    screen.syncPill();
+    return;
+  }
   if (name === 'export') {
     const { fileCard } = await import('./export');
     const log = document.querySelector('.chat-host .chat-log');

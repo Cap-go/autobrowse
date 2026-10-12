@@ -2532,22 +2532,57 @@ body {
   color: #111;
 }
 
-/* Page-only mode: just the composer pill floats under the page. */
+/* Page-only mode: a small status pill is all that remains of the chat. */
 .screen.browser.mode-page .divider,
-.screen.browser.mode-page .pills {
+.screen.browser.mode-page .composer-wrap,
+.screen.browser.mode-page .pill:first-child {
   display: none;
 }
 
-.screen.browser.mode-page .chat-area,
-.screen.browser.mode-page .composer-wrap {
+.screen.browser.mode-page .chat-area {
   background: var(--page-gutter);
+  padding: 6px 0 calc(var(--safe-bottom) + 6px);
 }
 
-.screen.browser.mode-page .composer-wrap {
-  padding-top: 8px;
+.screen.browser.mode-page .pills {
+  display: flex;
 }
 
-.screen.browser.mode-page .composer {
+.chat-pill {
+  max-width: 78%;
+  margin: 0 auto;
   background: var(--chat-surface);
   border-color: rgba(255, 255, 255, 0.16);
 }
+
+.screen.browser.mode-page .chat-pill {
+  display: inline-flex;
+}
+
+.chat-pill .spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.chat-pill-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chat-pill.unread::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  flex: none;
+}
+
+/* Demo-only mock pages keep a white page background. */
+.screen.browser .page-area.demo-page {
+  background: #fff;
+  color: #111;
+}
+

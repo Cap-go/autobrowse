@@ -46,6 +46,10 @@ interface Tab {
   pageShare: number;
   thumb?: string;
   lastText: string;
+  /** Live agent status shown on the collapsed chat pill ('' when idle). */
+  liveStatus: string;
+  /** An answer arrived while the chat was collapsed. */
+  unread: boolean;
   /** URL to open once the tab is on screen (links that arrive before render). */
   pendingUrl?: string;
 }
@@ -198,8 +202,9 @@ export class BrowserScreen {
     this.chatHost.addEventListener('touchmove', () => this.input.blur(), { passive: true });
     this.showPagePill = h('button', { class: 'pill', type: 'button' }, icon('globe'), h('span', {}, 'Show page'));
     this.showPagePill.addEventListener('click', () => this.setMode(this.active, 'split'));
-    this.showChatPill = h('button', { class: 'pill', type: 'button' }, icon('chat'), h('span', {}, 'Show chat'));
+    this.showChatPill = h('button', { class: 'pill chat-pill', type: 'button', 'aria-label': 'Open chat' });
     this.showChatPill.addEventListener('click', () => this.setMode(this.active, 'split'));
+    this.bindPillSwipe(this.showChatPill);
 
     this.input = h('textarea', { rows: 1, 'aria-label': 'Message', enterkeyhint: 'send' });
     this.send = h('button', { class: 'send', type: 'submit', 'aria-label': 'Send' }, icon('send'));
@@ -332,6 +337,8 @@ export class BrowserScreen {
       mode: 'split',
       pageShare: 0.55,
       lastText: '',
+      liveStatus: '',
+      unread: false,
     };
     let thumbTimer: ReturnType<typeof setTimeout> | undefined;
     tab.browser.onChange((b) => {
@@ -416,10 +423,25 @@ export class BrowserScreen {
     this.section.classList.toggle('mode-page', mode === 'page');
     this.section.style.setProperty('--page-share', String(pageShare));
     this.section.style.setProperty('--chat-share', String(1 - pageShare));
+    if (mode !== 'page') this.active.unread = false;
+    this.syncPill();
     requestAnimationFrame(() => {
       this.syncFrame();
       this.syncVisibility();
     });
+  }
+
+  /** Collapsed chat pill mirrors what the agent is doing. */
+  private syncPill(): void {
+    if (!this.showChatPill) return;
+    const tab = this.active;
+    const label = tab.busy ? tab.liveStatus || 'Thinking…' : tab.unread ? 'Answer ready' : 'Chat';
+    this.showChatPill.classList.toggle('busy', tab.busy);
+    this.showChatPill.classList.toggle('unread', !tab.busy && tab.unread);
+    this.showChatPill.replaceChildren(
+      tab.busy ? h('span', { class: 'spinner' }) : icon('chat'),
+      h('span', { class: 'chat-pill-label' }, label),
+    );
   }
 
   private syncFrame(): void {
@@ -730,7 +752,13 @@ export class BrowserScreen {
     const log = tab.log;
     const turn = h('div', { class: 'turn' });
     turn.append(h('div', { class: 'msg user' }, text));
-    const steps = new StepsBlock();
+    const steps = new StepsBlock((label) => {
+      tab.liveStatus = label;
+      if (tab === this.active) this.syncPill();
+    });
+    tab.liveStatus = 'Thinking…';
+    tab.unread = false;
+    if (tab === this.active) this.syncPill();
     const answer = h('div', { class: 'msg assistant' });
     const thinking = h('div', { class: 'thinking' }, h('span', { class: 'dot' }));
     turn.append(steps.el, answer, thinking);
@@ -804,6 +832,9 @@ export class BrowserScreen {
       thinking.remove();
       steps.finish();
       tab.busy = false;
+      tab.liveStatus = '';
+      if (tab.mode === 'page' || tab !== this.active) tab.unread = true;
+      if (tab === this.active) this.syncPill();
       scrollToEnd(log);
       if (tab === this.active) this.syncComposer();
       this.syncTabsButton();
@@ -1038,7 +1069,7 @@ class StepsBlock {
   private list: HTMLElement;
   private count = 0;
 
-  constructor() {
+  constructor(private onStatus: (label: string) => void = () => undefined) {
     this.head = h('button', { class: 'steps-head', type: 'button' });
     this.list = h('ol', { class: 'steps-list' });
     this.el = h('div', { class: 'steps', hidden: true }, this.head, this.list);
@@ -1071,11 +1102,13 @@ class StepsBlock {
   }
 
   waiting(label: string): void {
+    this.onStatus(label);
     this.el.hidden = false;
     this.head.replaceChildren(icon('hand'), h('span', { class: 'steps-title' }, label), icon('chevron', 'icon steps-chevron'));
   }
 
   private renderHead(running: boolean, current?: string): void {
+    this.onStatus(running ? (current ?? 'Browsing…') : '');
     this.head.replaceChildren(
       running ? h('span', { class: 'spinner' }) : icon('globe'),
       h('span', { class: 'steps-title' }, running ? (current ?? 'Browsing…') : `Browsed · ${this.count} ${this.count === 1 ? 'step' : 'steps'}`),
