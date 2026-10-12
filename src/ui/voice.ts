@@ -81,7 +81,8 @@ export class VoiceInput {
         popup: false,
         addPunctuation: true,
       });
-      const final = result.matches?.[0];
+      // Android resolves start() without a payload when partialResults is on.
+      const final = result?.matches?.[0];
       if (final) this.latest = final;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

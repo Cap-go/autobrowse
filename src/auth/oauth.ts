@@ -102,7 +102,7 @@ const SAFARI_USER_AGENT =
 /**
  * OpenAI only accepts an http://127.0.0.1 redirect. Loading that in Safari
  * (ASWebAuthenticationSession) shows an insecure-connection warning, so the
- * login runs in an in-app WKWebView instead: 127.0.0.1 is a blocked host, the
+ * login runs in an in-app webview instead: 127.0.0.1 is a blocked host, the
  * redirect is cancelled before it loads and we read the code from its URL.
  */
 async function runNativeWebViewAuth(
@@ -112,6 +112,7 @@ async function runNativeWebViewAuth(
   const handles: PluginListenerHandle[] = [];
   let webViewId: string | undefined;
   let settled = false;
+  let listenersReady: Promise<unknown>;
 
   const result = new Promise<OAuthCallbackParams>((resolve, reject) => {
     const finish = (fn: () => void): void => {
@@ -119,24 +120,27 @@ async function runNativeWebViewAuth(
       settled = true;
       fn();
     };
-    void InAppBrowser.addListener('urlChangeEvent', (event) => {
+    listenersReady = Promise.all([InAppBrowser.addListener('urlChangeEvent', (event) => {
       if (webViewId && event.id && event.id !== webViewId) return;
-      if (!event.url.startsWith(attempt.redirectUri)) return;
+      if (!isOAuthRedirect(event.url, attempt.redirectUri)) return;
       finish(() => resolve(parseRedirectUri(event.url)));
-    }).then((h) => handles.push(h));
-    void InAppBrowser.addListener('closeEvent', (event) => {
+    }).then((h) => handles.push(h)),
+    InAppBrowser.addListener('closeEvent', (event) => {
       if (webViewId && event.id && event.id !== webViewId) return;
       finish(() => reject(new Error('Sign in was cancelled')));
-    }).then((h) => handles.push(h));
+    }).then((h) => handles.push(h))]);
   });
 
   try {
+    await listenersReady!;
     const opened = await InAppBrowser.openWebView({
       url: authorizeUrl,
       title: 'Sign in with ChatGPT',
       toolbarType: ToolBarType.COMPACT,
       blockedHosts: ['127.0.0.1'],
-      customUserAgent: SAFARI_USER_AGENT,
+      customUserAgent: Capacitor.getPlatform() === 'ios'
+        ? SAFARI_USER_AGENT
+        : navigator.userAgent.replace('; wv', '').replace('Version/4.0 ', ''),
       enabledSafeBottomMargin: true,
       enabledSafeTopMargin: true,
     });
@@ -146,6 +150,16 @@ async function runNativeWebViewAuth(
     settled = true;
     await Promise.all(handles.map((h) => h.remove()));
     await InAppBrowser.close(webViewId ? { id: webViewId } : undefined).catch(() => undefined);
+  }
+}
+
+export function isOAuthRedirect(url: string, redirectUri: string): boolean {
+  try {
+    const actual = new URL(url);
+    const expected = new URL(redirectUri);
+    return actual.origin === expected.origin && actual.pathname === expected.pathname;
+  } catch {
+    return false;
   }
 }
 

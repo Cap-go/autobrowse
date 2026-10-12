@@ -21,8 +21,8 @@
   --danger: #f87171;
   --border: rgba(255, 255, 255, 0.08);
   --radius: 18px;
-  --safe-top: env(safe-area-inset-top);
-  --safe-bottom: env(safe-area-inset-bottom);
+  --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top));
+  --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom));
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -1618,6 +1618,19 @@ body {
 
 .kb-open .welcome .starters {
   display: none;
+}
+
+.native-typing .start-page {
+  visibility: hidden;
+}
+
+.page-typing-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
 }
 
 /* Conversation */

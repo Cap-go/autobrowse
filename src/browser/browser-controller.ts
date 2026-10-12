@@ -1,4 +1,5 @@
 import type { PluginListenerHandle } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { InAppBrowser, ToolBarType } from '@capgo/capacitor-inappbrowser';
 
 export interface BrowserSnapshot {
@@ -36,8 +37,13 @@ type TabListener = (tab: BrowserTab) => void;
 const tabsByWebView = new Map<string, BrowserTab>();
 let listenersReady: Promise<void> | undefined;
 
-function roundFrame(f: BrowserFrame): BrowserFrame {
-  return { x: Math.round(f.x), y: Math.round(f.y), width: Math.round(f.width), height: Math.round(f.height) };
+const BrowserLayout = registerPlugin<{ getOrigin(): Promise<{ x: number; y: number }> }>('BrowserLayout');
+
+async function nativeFrame(f: BrowserFrame): Promise<BrowserFrame> {
+  // Android dialogs use screen coordinates; older WebViews are inset by the
+  // host activity. Both plugins accept dp, so never multiply by devicePixelRatio.
+  const origin = Capacitor.getPlatform() === 'android' ? await BrowserLayout.getOrigin() : { x: 0, y: 0 };
+  return { x: Math.round(f.x + origin.x), y: Math.round(f.y + origin.y), width: Math.round(f.width), height: Math.round(f.height) };
 }
 
 /** Channel used by the in-page link guard to report app links. */
@@ -279,7 +285,7 @@ export class BrowserTab {
   async setFrame(next: BrowserFrame | null): Promise<void> {
     this.frame = next;
     if (this.webViewId && next) {
-      await InAppBrowser.updateDimensions({ id: this.webViewId, ...roundFrame(next) }).catch(() => undefined);
+      await InAppBrowser.updateDimensions({ id: this.webViewId, ...await nativeFrame(next) }).catch(() => undefined);
     }
   }
 
@@ -305,7 +311,11 @@ export class BrowserTab {
     const result = await InAppBrowser.openWebView({
       url,
       ...(this.frame
-        ? { ...roundFrame(this.frame), toolbarType: ToolBarType.BLANK }
+        ? {
+            ...await nativeFrame(this.frame),
+            toolbarType: ToolBarType.BLANK,
+            ...(Capacitor.getPlatform() === 'android' ? { enabledSafeTopMargin: false, enabledSafeBottomMargin: false } : {}),
+          }
         : {
             toolbarType: ToolBarType.NAVIGATION,
             showReloadButton: true,
@@ -319,6 +329,8 @@ export class BrowserTab {
       // preShowScript here: the plugin rejects it unless isPresentAfterPageLoad
       // is true, which hides the page until it fully loads.
       preventDeeplink: true,
+      // Android's blank toolbar only navigates history when native navigation is active.
+      ...(Capacitor.getPlatform() === 'android' ? { activeNativeNavigationForWebview: true } : {}),
     });
     this.webViewId = result.id;
     tabsByWebView.set(result.id, this);

@@ -1,61 +1,33 @@
-# OAuth loopback spike (Sign in with ChatGPT)
+# OAuth loopback (Sign in with ChatGPT)
 
-OpenAI documents Sign in with ChatGPT for open-source clients as a **public OAuth 2 + PKCE (S256)** flow with an **HTTP loopback redirect** on `127.0.0.1` (not `localhost`, fixed path, port may change per attempt). See:
+Auto Browse uses public OAuth 2 + PKCE (S256), plan-usage scopes, and an HTTP loopback redirect at `127.0.0.1` with `/auth/callback`. Tokens and the issued client ID stay in secure device storage (Keychain on iOS; Keystore-backed storage on Android).
 
-- [Registration and sign-in](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
-- [Quickstart](https://developers.openai.com/siwc/quickstart)
+## Native flow
 
-This app must use plan-usage scopes (`offline_access`, `resource.invoke`, `chatgpt.tokens.use.direct`) with `resource=https://api.openai.com/v1`, store tokens in Keychain/Keystore, and never persist them in web storage.
+1. `beginOAuthAttempt()` starts the local `@capgo/oauth-loopback` listener to obtain a port and redirect URI, then creates state, nonce and PKCE values.
+2. `runAuthorizationInBrowser()` registers and awaits URL/close listeners before opening `InAppBrowser.openWebView()`. Native sign-in uses the in-app webview on both platforms, with a compact toolbar and `blockedHosts: ['127.0.0.1']`.
+3. The browser cancels navigation to the loopback host and emits `urlChangeEvent` containing the callback URL. Android plugin 8.22.2 explicitly emits this event for blocked main-frame navigations before returning `true` from `shouldOverrideUrlLoading`; no dependency patch is needed.
+4. The callback must match the exact redirect origin and path. The app then validates state and the issued client ID, exchanges the authorization code and verifies the ID token. URL/close listeners and the webview are cleaned up in `finally`; the loopback listener is stopped when sign-in finishes.
 
-## What we implemented
+The iOS login uses the existing Mobile Safari user agent; Android uses its own mobile Chrome user agent with the embedded-WebView markers removed. This does not guarantee acceptance by every third-party identity provider.
 
-| Layer | Approach |
-| --- | --- |
-| PKCE + authorize URL | TypeScript in `src/auth/oauth.ts` and `src/auth/pkce.ts` |
-| Token storage | `capacitor-secure-storage-plugin` via `src/auth/secure-storage.ts` |
-| Loopback listener | Local Capacitor plugin `@capgo/oauth-loopback` (NanoHTTPD on Android, `NWListener` on iOS loopback) |
-| System browser for login | Primary: `@capgo/capacitor-inappbrowser` `openSecureWindow()` with the same `http://127.0.0.1:<port>/auth/callback` redirect |
-| Loopback fallback | If `openSecureWindow` fails, wait on `OAuthLoopback.waitForCallback()` while opening the authorize URL in the secure session |
+The Android loopback server now compiles against NanoHTTPD and binds specifically to `127.0.0.1`, rather than all interfaces. Native authorization does not need the callback network request to reach this server; it captures the blocked redirect before loading it.
 
-### Why both loopback and `openSecureWindow`?
+## Verified on Android
 
-OpenAI requires loopback. `@capgo/capacitor-inappbrowser` documents custom URL schemes for mobile `openSecureWindow`, but also accepts an arbitrary `redirectUri` string and validates the final redirected URL. We pass the loopback URI so the flow matches the provider contract when the OS allows it.
+API 36 ARM64 emulator / Android WebView 133:
 
-The `@capgo/oauth-loopback` plugin exists because **something in the app process must accept `http://127.0.0.1:<port>/auth/callback`** when the system browser returns to loopback instead of handing the URL to `ASWebAuthenticationSession` alone.
+- OpenAI's login page loads inside the native webview.
+- Closing the webview cancels sign-in and re-enables the connect button.
+- A synthetic navigation to the blocked callback reaches the real `runAuthorizationInBrowser()` flow, returns the test code/state/client ID, passes callback validation, and closes the login webview.
+- Secure-storage set/get/remove succeeds.
 
-## Platform notes (honest status)
+A real ChatGPT sign-in, issued tokens, token refresh, consent and identity-provider MFA were not tested. No reviewer password or real account credentials were used. See `store/android/verification.md`.
 
-### iOS (unverified on device in CI)
+## Web development
 
-- **Intended path:** `OAuthLoopback` binds `NWListener` on loopback, then `openSecureWindow` opens `https://auth.openai.com/...` with `redirectUri` set to the listener URL.
-- **Risk:** Apple’s `ASWebAuthenticationSession` historically favored custom schemes; loopback support for third-party OAuth varies by iOS version. We have not run this against a physical device in automated CI.
-- **Fallback:** Keep the loopback server running and use a full-screen `openWebView` only if product testing shows `openSecureWindow` cannot complete loopback (not enabled in this scaffold).
+The web implementation uses the local plugin's BroadcastChannel callback mechanism. It has no real HTTP loopback listener; use the native shell to validate provider login and blocked redirects. Demo states are development-only and are excluded from production builds.
 
-### Android (unverified on device in CI)
+## Security and remaining device checks
 
-- **Intended path:** NanoHTTPD loopback server in the app process + Custom Tabs via `openSecureWindow`.
-- **Risk:** Some OEM browsers may not route `127.0.0.1` back into the hosting app; user may need the default Chrome custom tab provider.
-- **Fallback:** Same as iOS: rely on loopback listener and retry with a fresh port if the tab stalls.
-
-### Web (dev only)
-
-- `OAuthLoopback` web implementation uses a `BroadcastChannel` compatible with `openSecureWindow` on web. There is **no real loopback server in the browser**; desktop dev should use the native shells for realistic OAuth testing.
-
-## Token lifecycle
-
-- Access token TTL: 1 hour (per OpenAI docs).
-- Refresh token: 30 days, rotating (replace stored refresh token on every refresh).
-- On `401` or near expiry, `src/agent/loop.ts` calls `refreshAccessToken()` before Responses API calls.
-
-## Security
-
-- Tokens and host id live only in secure storage.
-- OAuth `state`, `nonce`, and PKCE verifier are kept in memory for the pending attempt only.
-- Logs must not print tokens (enforced by convention; add lint rules later if needed).
-
-## Next manual test checklist
-
-1. Fresh install, tap **Continue with ChatGPT**, complete login, confirm `oaiapp_` client id is stored.
-2. Kill app, relaunch, confirm silent reauth with saved client id (account picker or `id_token_hint` flow).
-3. Revoke app in ChatGPT settings, confirm graceful error.
-4. Airplane mode during token refresh, confirm user-visible error without crash.
+State, nonce and PKCE verifier are held in memory. Access/refresh tokens and client IDs use secure storage; tokens never belong in web storage or logs. After an actual sign-in, verify refresh/rotation, revoke the app in ChatGPT, and check network failure and expired-token handling. Password manager autofill and third-party identity-provider login still need physical-device QA.

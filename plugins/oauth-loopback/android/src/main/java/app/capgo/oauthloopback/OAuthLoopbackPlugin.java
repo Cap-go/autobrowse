@@ -107,13 +107,14 @@ public class OAuthLoopbackPlugin extends Plugin {
         private final AtomicReference<JSObject> callback = new AtomicReference<>();
 
         LoopbackSession(String sessionId, int port, String path, String completionUri) {
-            super(port);
+            super("127.0.0.1", port);
             this.sessionId = sessionId;
             this.path = path;
             this.completionUri = completionUri;
         }
 
-        void start() throws IOException {
+        @Override
+        public void start() throws IOException {
             start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
         }
 

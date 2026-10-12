@@ -34,7 +34,7 @@ const ONBOARDING = [
   {
     art: 'shield' as const,
     title: 'Private by design',
-    body: 'Your ChatGPT sign in stays in the device Keychain. No Capgo account, no tracking, no ads.',
+    body: 'Your ChatGPT sign in stays in secure device storage. No Capgo account, no tracking, no ads.',
   },
 ];
 
@@ -42,6 +42,7 @@ export class App {
   private root: HTMLElement;
   private screen: Screen = 'onboarding';
   private creds: OAuthCredentialRecord | null = null;
+  private sheets: Array<() => void> = [];
   private screenView = new BrowserScreen({
     creds: () => this.creds,
     openSignIn: () => this.openSignInSheet(),
@@ -76,6 +77,15 @@ export class App {
     markOnboarded();
     this.screenView.handleDeepLink(link);
     if (this.screen !== 'main') this.go('main');
+  }
+
+  async handleBack(): Promise<boolean> {
+    const close = this.sheets.at(-1);
+    if (close) {
+      close();
+      return true;
+    }
+    return this.screen === 'main' && await this.screenView.handleBack();
   }
 
   private go(screen: Screen): void {
@@ -231,7 +241,7 @@ export class App {
       h(
         'ul',
         { class: 'bullets' },
-        bullet('shield', 'Tokens stay in the device Keychain'),
+        bullet('shield', 'Tokens stay in secure device storage'),
         bullet('hand', 'Asks before important actions'),
         bullet('globe', 'Works on any website'),
       ),
@@ -282,6 +292,7 @@ export class App {
     const close = (): void => {
       if (closed) return;
       closed = true;
+      this.sheets = this.sheets.filter((fn) => fn !== close);
       this.screenView.showPages();
       backdrop.classList.add('closing');
       window.setTimeout(() => backdrop.remove(), 200);
@@ -292,6 +303,7 @@ export class App {
     sheet.querySelector('.sheet-head .icon-btn')?.addEventListener('click', close);
     bindSheetDrag(sheet, backdrop, close);
     document.body.append(backdrop);
+    this.sheets.push(close);
     return close;
   }
 
@@ -311,7 +323,7 @@ export class App {
         h(
           'p',
           { class: 'lede' },
-          'The agent uses your own ChatGPT plan. Your sign in is stored only in this device Keychain.',
+          'The agent uses your own ChatGPT plan. Your sign in is stored only in secure device storage.',
         ),
         btn,
         status,

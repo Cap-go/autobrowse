@@ -6,6 +6,13 @@ dist-tsc/
 .vscode/
 *.log
 android/.gradle/
+android/.kotlin/
+android/local.properties
+android/keystore.properties
+*.jks
+*.keystore
+*.aab
+*.apk
 android/app/build/
 android/build/
 ios/App/Pods/

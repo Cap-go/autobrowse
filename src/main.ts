@@ -15,6 +15,13 @@ if (Capacitor.isNativePlatform()) void CapacitorUpdater.notifyAppReady().catch((
 trackKeyboard();
 void CapApp.addListener('appStateChange', ({ isActive }) => setAppActive(isActive));
 const app = new App(root);
+if (Capacitor.getPlatform() === 'android') {
+  void CapApp.addListener('backButton', () => {
+    void app.handleBack().then((handled) => {
+      if (!handled) void CapApp.minimizeApp();
+    });
+  });
+}
 const demo = import.meta.env.DEV ? new URLSearchParams(location.search).get('demo') : null;
 if (demo) {
   void import('./ui/demo').then(({ runDemo }) => runDemo(app, demo));

@@ -1,7 +1,18 @@
 import { describe, expect, test } from 'bun:test';
-import { parseRedirectUri, validateCallback } from '../src/auth/oauth';
+import { isOAuthRedirect, parseRedirectUri, validateCallback } from '../src/auth/oauth';
 
 describe('oauth callback parsing', () => {
+  test('blocked redirects must match the exact callback origin and path', () => {
+    const redirect = 'http://127.0.0.1:1455/auth/callback';
+    expect(isOAuthRedirect(`${redirect}?code=abc&state=s1`, redirect)).toBe(true);
+    for (const url of [
+      `${redirect}/evil?code=abc`,
+      'http://127.0.0.1:1456/auth/callback?code=abc',
+      'https://127.0.0.1:1455/auth/callback?code=abc',
+      'http://127.0.0.1.evil.com:1455/auth/callback?code=abc',
+      'invalid',
+    ]) expect(isOAuthRedirect(url, redirect)).toBe(false);
+  });
   test('parseRedirectUri reads query params', () => {
     const params = parseRedirectUri(
       'http://127.0.0.1:1455/auth/callback?code=abc&state=s1&client_id=oaiapp_test',

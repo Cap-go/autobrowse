@@ -1,6 +1,8 @@
 import type { OAuthCredentialRecord } from '../auth/types';
 import { appendUserMessage, createInitialState, runAgentTurn, type AgentLoopState } from '../agent/loop';
 import { AppLauncher } from '@capacitor/app-launcher';
+import { Capacitor } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 import { BrowserTab, onExternalLink, onPillTap } from '../browser/browser-controller';
 import { isAppActive, onAppActiveChange } from '../agent/lifecycle';
 import type { DeepLinkAction } from '../deeplink';
@@ -79,6 +81,7 @@ export class BrowserScreen {
   private active!: Tab;
   private nextId = 1;
   private overlayOpen = false;
+  private closeOverlay?: () => void;
   private sheetsOpen = 0;
   private offscreen = false;
   private cleanups: Array<() => void> = [];
@@ -106,14 +109,11 @@ export class BrowserScreen {
     });
   }
 
-  private externalPrompt = false;
-
   /** A page wants to open another app (mailto:, tel:, youtube://…): ask first. */
   private confirmExternal(tab: BrowserTab, url: string): void {
     const owner = this.tabs.find((t) => t.browser === tab);
     // Only the visible tab may prompt; background tabs and agents never leave the app.
-    if (!owner || owner !== this.active || this.externalPrompt || this.overlayOpen) return;
-    this.externalPrompt = true;
+    if (!owner || owner !== this.active || this.sheetsOpen > 0 || this.overlayOpen) return;
     const target = describeExternal(url);
     const site = tab.url ? prettyUrl(tab.url).split('/')[0] : 'This page';
     let close: () => void = () => undefined;
@@ -132,11 +132,7 @@ export class BrowserScreen {
       open,
       stay,
     );
-    const closeSheet = this.host.openSheet('Leave Auto Browse?', body);
-    close = () => {
-      this.externalPrompt = false;
-      closeSheet();
-    };
+    close = this.host.openSheet('Leave Auto Browse?', body);
   }
 
   // ---------- public API ----------
@@ -227,6 +223,33 @@ export class BrowserScreen {
 
     section.append(bar, this.progress, this.pageArea, divider, chat);
 
+    if (Capacitor.getPlatform() === 'android') {
+      // A focused native dialog prevents the host WebView from opening its IME.
+      // Keep a tab preview visible while typing, then restore the live page.
+      let editing = false;
+      const finishEditing = (): void => {
+        if (!editing) return;
+        editing = false;
+        section.classList.remove('native-typing');
+        this.pageArea.querySelector('.page-typing-preview')?.remove();
+        this.showPages();
+      };
+      section.addEventListener('focusin', (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) || editing) return;
+        editing = true;
+        section.classList.add('native-typing');
+        if (this.active.browser.isOpen && this.active.thumb) {
+          this.pageArea.append(h('img', { class: 'page-typing-preview', src: this.active.thumb, alt: 'Page preview while typing' }));
+        }
+        void this.hidePages().then(() => {
+          if (document.activeElement === target) void Keyboard.show().catch(() => undefined);
+        });
+      });
+      section.addEventListener('focusout', finishEditing);
+      this.cleanups.push(finishEditing);
+    }
+
     const observer = new ResizeObserver(() => this.syncFrame());
     observer.observe(this.pageArea);
     this.cleanups.push(() => observer.disconnect());
@@ -242,10 +265,22 @@ export class BrowserScreen {
     this.cleanups.splice(0).forEach((fn) => fn());
   }
 
+  async handleBack(): Promise<boolean> {
+    if (this.closeOverlay) {
+      this.closeOverlay();
+      return true;
+    }
+    if (this.active.browser.isOpen && this.active.browser.canGoBack) {
+      await this.active.browser.goBack();
+      return true;
+    }
+    return false;
+  }
+
   /** Hide every native page (sheets, other screens). Counted so nested sheets work. */
-  hidePages(): void {
+  async hidePages(): Promise<void> {
     this.sheetsOpen += 1;
-    for (const tab of this.tabs) void tab.browser.setVisible(false);
+    await Promise.all(this.tabs.map((tab) => tab.browser.setVisible(false)));
   }
 
   showPages(): void {
@@ -1025,8 +1060,10 @@ export class BrowserScreen {
     const close = (): void => {
       overlay.remove();
       this.overlayOpen = false;
+      this.closeOverlay = undefined;
       this.syncVisibility();
     };
+    this.closeOverlay = close;
     const grid = h('div', { class: 'tab-grid' });
     const renderGrid = (): void => {
       grid.replaceChildren(
