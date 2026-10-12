@@ -2539,9 +2539,29 @@ body {
   display: none;
 }
 
+.screen.browser {
+  position: relative;
+}
+
+/* The page fills the screen; the chat pill floats over it. */
 .screen.browser.mode-page .chat-area {
-  background: var(--page-gutter);
-  padding: 6px 0 calc(var(--safe-bottom) + 6px);
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  flex: none;
+  background: transparent;
+  padding: 0 0 calc(var(--safe-bottom) + 10px);
+  pointer-events: none;
+}
+
+.screen.browser.mode-page .chat-pill {
+  pointer-events: auto;
+}
+
+/* With a website open the pill is drawn inside the page (native layer on top). */
+.screen.browser.mode-page.page-open .chat-area {
+  display: none;
 }
 
 .screen.browser.mode-page .pills {

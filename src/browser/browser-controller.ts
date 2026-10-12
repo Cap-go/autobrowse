@@ -74,6 +74,64 @@ const LINK_GUARD_SCRIPT = `(() => {
   };
 })();`;
 
+const PILL_CHANNEL = 'capgo-chat-pill';
+
+export interface PillState {
+  label: string;
+  busy: boolean;
+  unread: boolean;
+  /** Distance from the bottom of the page viewport, in CSS px. */
+  bottom: number;
+}
+
+/**
+ * Floating chat pill drawn inside the page (Shadow DOM, so site CSS cannot
+ * touch it). Used when the chat is collapsed: the native page fills the
+ * screen and native layers sit above the app UI, so the pill must live in
+ * the page to float over it. Taps are reported to the app.
+ */
+export function pillScript(state: PillState | null): string {
+  return `(() => {
+    const ID = '__autobrowse_pill';
+    let host = document.getElementById(ID);
+    const state = ${JSON.stringify(state)};
+    if (!state) { if (host) host.remove(); return; }
+    if (!host) {
+      host = document.createElement('div');
+      host.id = ID;
+      host.setAttribute('data-autobrowse-ui', '');
+      host.style.cssText = 'all:initial;position:fixed;left:0;right:0;z-index:2147483647;display:flex;justify-content:center;pointer-events:none';
+      const root = host.attachShadow({ mode: 'open' });
+      root.innerHTML = '<style>' +
+        'button{all:initial;pointer-events:auto;display:inline-flex;align-items:center;gap:8px;max-width:78vw;padding:9px 16px;border-radius:999px;' +
+        'background:#262626;color:#ececec;border:1px solid rgba(255,255,255,.18);font:500 15px -apple-system,system-ui,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent}' +
+        '.l{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}' +
+        '.s{width:13px;height:13px;border-radius:999px;border:2px solid #3d3d3d;border-top-color:#34d399;animation:r .8s linear infinite;flex:none}' +
+        '.d{width:8px;height:8px;border-radius:999px;background:#34d399;flex:none}' +
+        'svg{width:16px;height:16px;flex:none}@keyframes r{to{transform:rotate(360deg)}}</style>' +
+        '<button type="button" aria-label="Open chat"></button>';
+      root.querySelector('button').addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        try { window.mobileApp.postMessage({ detail: { channel: '${PILL_CHANNEL}' } }); } catch (err) {}
+      });
+      (document.body || document.documentElement).appendChild(host);
+    }
+    host.style.bottom = state.bottom + 'px';
+    const b = host.shadowRoot.querySelector('button');
+    const chat = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>';
+    b.innerHTML = (state.busy ? '<span class="s"></span>' : chat) + '<span class="l"></span>' + (state.unread ? '<span class="d"></span>' : '');
+    b.querySelector('.l').textContent = state.label;
+  })();`;
+}
+
+type PillTapHandler = (tab: BrowserTab) => void;
+let pillTapHandler: PillTapHandler | null = null;
+
+/** Called when the in-page chat pill is tapped. */
+export function onPillTap(handler: PillTapHandler): void {
+  pillTapHandler = handler;
+}
+
 type ExternalLinkHandler = (tab: BrowserTab, url: string) => void;
 let externalLinkHandler: ExternalLinkHandler | null = null;
 
@@ -85,9 +143,14 @@ export function onExternalLink(handler: ExternalLinkHandler): void {
 async function registerBrowserListeners(): Promise<void> {
   await InAppBrowser.addListener('messageFromWebview', (event) => {
     const detail = event.detail as { channel?: string; url?: string } | undefined;
-    if (detail?.channel !== EXTERNAL_LINK_CHANNEL || !detail.url) return;
     const tab = event.id ? tabsByWebView.get(event.id) : undefined;
-    if (tab) externalLinkHandler?.(tab, detail.url);
+    if (!tab) return;
+    if (detail?.channel === PILL_CHANNEL) {
+      pillTapHandler?.(tab);
+      return;
+    }
+    if (detail?.channel !== EXTERNAL_LINK_CHANNEL || !detail.url) return;
+    externalLinkHandler?.(tab, detail.url);
   });
   await InAppBrowser.addListener('urlChangeEvent', (event) => {
     const tab = event.id ? tabsByWebView.get(event.id) : undefined;
@@ -113,6 +176,7 @@ export class BrowserTab {
   url: string | null = null;
   title = '';
   loading = false;
+  private pill: PillState | null = null;
   /** Whether the page has history to go back to (refreshed after each load). */
   canGoBack = false;
   private frame: BrowserFrame | null = null;
@@ -144,6 +208,7 @@ export class BrowserTab {
   handleLoaded(): void {
     this.loading = false;
     this.injectLinkGuard();
+    if (this.pill) void this.applyPill();
     void this.refreshCanGoBack();
     for (const waiter of [...this.loadWaiters]) waiter();
     void this.refreshTitle();
@@ -190,6 +255,18 @@ export class BrowserTab {
     } catch {
       /* keep previous value */
     }
+  }
+
+  /** Show/update (or remove with null) the floating chat pill inside the page. */
+  async setPill(state: PillState | null): Promise<void> {
+    const same = JSON.stringify(state) === JSON.stringify(this.pill);
+    this.pill = state;
+    if (!same) await this.applyPill();
+  }
+
+  private async applyPill(): Promise<void> {
+    if (!this.webViewId) return;
+    await InAppBrowser.executeScript({ id: this.webViewId, code: pillScript(this.pill) }).catch(() => undefined);
   }
 
   /** Install the app-link guard in the current document (idempotent). */
@@ -346,6 +423,7 @@ export class BrowserTab {
       );
       const elements = [];
       for (const el of nodes) {
+        if (el.closest('[data-autobrowse-ui]')) continue;
         const r = el.getBoundingClientRect();
         if (r.width < 4 || r.height < 4 || r.bottom < 0 || r.top > vh || r.right < 0 || r.left > vw) continue;
         // Never expose what is typed in password/sensitive fields.

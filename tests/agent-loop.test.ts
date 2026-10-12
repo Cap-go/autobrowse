@@ -462,3 +462,17 @@ describe('native plugin contract', () => {
     expect(codes.some((code) => code.includes('__autoBrowseLinkGuard'))).toBe(true);
   });
 });
+
+describe('in-page chat pill', () => {
+  test('setPill injects, skips identical updates and removes', async () => {
+    await browser.open('https://example.com/pill');
+    browserPlugin.executeScript.mockClear();
+    const state = { label: 'Thinking…', busy: true, unread: false, bottom: 44 };
+    await browser.setPill(state);
+    await browser.setPill({ ...state });
+    expect(browserPlugin.executeScript).toHaveBeenCalledTimes(1);
+    expect(String((browserPlugin.executeScript.mock.calls[0] as unknown as [{ code: string }])[0].code)).toContain('__autobrowse_pill');
+    await browser.setPill(null);
+    expect(browserPlugin.executeScript).toHaveBeenCalledTimes(2);
+  });
+});

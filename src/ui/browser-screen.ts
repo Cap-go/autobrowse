@@ -1,7 +1,7 @@
 import type { OAuthCredentialRecord } from '../auth/types';
 import { appendUserMessage, createInitialState, runAgentTurn, type AgentLoopState } from '../agent/loop';
 import { AppLauncher } from '@capacitor/app-launcher';
-import { BrowserTab, onExternalLink } from '../browser/browser-controller';
+import { BrowserTab, onExternalLink, onPillTap } from '../browser/browser-controller';
 import { isAppActive, onAppActiveChange } from '../agent/lifecycle';
 import type { DeepLinkAction } from '../deeplink';
 import type { AskUserRequest, AskUserResult, SecretRequest, SecretRequestResult } from '../agent/types';
@@ -101,6 +101,9 @@ export class BrowserScreen {
   constructor(private host: BrowserScreenHost) {
     this.active = this.createTab();
     onExternalLink((tab, url) => this.confirmExternal(tab, url));
+    onPillTap((browser) => {
+      if (browser === this.active.browser) this.setMode(this.active, 'split');
+    });
   }
 
   private externalPrompt = false;
@@ -442,6 +445,15 @@ export class BrowserScreen {
       tab.busy ? h('span', { class: 'spinner' }) : icon('chat'),
       h('span', { class: 'chat-pill-label' }, label),
     );
+    // With a page open the native page covers the app UI, so the pill is drawn
+    // inside the page instead (floating over it, full height).
+    const inPage = tab.mode === 'page' && tab.browser.isOpen && !this.overlayOpen && this.sheetsOpen === 0;
+    for (const other of this.tabs) {
+      if (other !== tab) void other.browser.setPill(null);
+    }
+    void tab.browser.setPill(
+      inPage ? { label, busy: tab.busy, unread: !tab.busy && tab.unread, bottom: safeBottom() + 10 } : null,
+    );
   }
 
   private syncFrame(): void {
@@ -452,6 +464,7 @@ export class BrowserScreen {
   }
 
   private syncVisibility(): void {
+    queueMicrotask(() => this.syncPill());
     const showActive = !this.offscreen && !this.overlayOpen && this.sheetsOpen === 0 && this.active.mode !== 'chat' && !!this.section?.isConnected;
     for (const tab of this.tabs) {
       void tab.browser.setVisible(tab === this.active && showActive);
@@ -534,12 +547,14 @@ export class BrowserScreen {
     const b = this.active.browser;
     const hasPage = b.isOpen || !!b.url;
     this.section.classList.toggle('has-page', hasPage);
+    this.section.classList.toggle('page-open', b.isOpen);
     this.section.classList.toggle('loading', b.loading);
     if (document.activeElement !== this.address) {
       this.address.value = b.url ? prettyUrl(b.url) : '';
     }
     this.backBtn.hidden = !hasPage;
     this.backBtn.disabled = !b.canGoBack;
+    this.syncPill();
     this.reloadBtn.hidden = !b.isOpen;
     this.syncStatus();
   }
@@ -1142,4 +1157,14 @@ function describeExternal(url: string): { app: string; detail?: string } {
       return { app: name ? `the ${name} app` : 'another app' };
     }
   }
+}
+
+/** Bottom safe-area inset in CSS px (home indicator). */
+function safeBottom(): number {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;bottom:0;height:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden';
+  document.body.append(probe);
+  const value = probe.getBoundingClientRect().height;
+  probe.remove();
+  return value;
 }
