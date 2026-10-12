@@ -122,3 +122,10 @@ Guest browsing does not require credentials. AI features require ChatGPT sign-in
 4. Ask "Open Hacker News and summarize the top 3 stories." Watch the native page and chat. Drag the divider to collapse chat; tap the Chat pill to reopen it.
 5. Microphone permission is optional; typing works without it. Save / Share opens Android's Sharesheet for generated files.
 6. Settings provides Sign out and browsing-data clearing. Auto Browse creates no separate account, has no ads and sells no in-app purchases.
+
+## Generative AI policy
+
+Every AI answer has a **Report** button (flag icon) that opens an in-app sheet
+(reason + optional details). Reports are sent without leaving the app to
+`workers/report` (Cloudflare Worker, https://autobrowse-report.digitalshift-ee.workers.dev/report),
+which emails them to tori@capgo.app.

@@ -1,0 +1,22 @@
+{
+  // Receives "Report this AI answer" from the Auto Browse app (Google Play
+  // generative-AI policy) and emails it to the team.
+  "name": "autobrowse-report",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "account_id": "9ee3d7479a3c359681e3fab2c8cb22c0",
+  "workers_dev": true,
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "allowed_destination_addresses": ["tori@capgo.app"]
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "LIMITER",
+      "namespace_id": "4217",
+      "simple": { "limit": 5, "period": 60 }
+    }
+  ]
+}

@@ -46,3 +46,6 @@ export const APP_LINKS = {
 export const PREF_KEYS = {
   onboarded: 'capgo_browser_onboarded_v1',
 } as const;
+
+/** Receives "Report this answer" (workers/report). */
+export const REPORT_URL = 'https://autobrowse-report.digitalshift-ee.workers.dev/report';

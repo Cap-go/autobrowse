@@ -21,7 +21,8 @@ import {
   toUrl,
 } from './helpers';
 import { renderMarkdown } from './markdown';
-import { fileCard } from './export';
+import { copyText, fileCard } from './export';
+import { sendReport } from './report';
 import { VoiceInput } from './voice';
 
 export interface BrowserScreenHost {
@@ -872,6 +873,9 @@ export class BrowserScreen {
       tab.agentState = result.state;
       const final = result.assistantText || streamed || (tab.stopRequested ? 'Stopped.' : 'Done.');
       renderAnswer(final);
+      if (result.assistantText || streamed) {
+        turn.append(this.answerActions(final, text, pageUrl ?? tab.browser.url));
+      }
       tab.lastText = final.replace(/\s+/g, ' ').slice(0, 120);
       if (tab !== this.active) toast(`Tab ${this.tabs.indexOf(tab) + 1}: agent finished`);
     } catch (error) {
@@ -889,6 +893,66 @@ export class BrowserScreen {
       if (tab === this.active) this.syncComposer();
       this.syncTabsButton();
     }
+  }
+
+  // ---------- answer actions (copy / report) ----------
+
+  /** Copy and Report under an AI answer (Google Play generative-AI policy). */
+  private answerActions(answer: string, prompt: string, pageUrl: string | null): HTMLElement {
+    const copy = h('button', { class: 'answer-action', type: 'button', 'aria-label': 'Copy answer' }, icon('copy'));
+    copy.addEventListener('click', () => void copyText(answer, 'Answer copied'));
+    const report = h('button', { class: 'answer-action', type: 'button', 'aria-label': 'Report this answer' }, icon('flag'));
+    report.addEventListener('click', () => this.openReport(answer, prompt, pageUrl));
+    return h('div', { class: 'answer-actions' }, copy, report);
+  }
+
+  private openReport(answer: string, prompt: string, pageUrl: string | null): void {
+    const reasons: Array<[string, string]> = [
+      ['offensive', 'Offensive or hateful'],
+      ['harmful', 'Harmful or dangerous'],
+      ['wrong', 'Wrong or misleading'],
+      ['other', 'Something else'],
+    ];
+    let reason = '';
+    const note = h('textarea', { rows: 3, placeholder: 'Add details (optional)', 'aria-label': 'Details', class: 'report-note' });
+    const send = h('button', { class: 'primary block', type: 'button', disabled: true }, 'Send report');
+    const choices = h(
+      'div',
+      { class: 'report-reasons', role: 'radiogroup' },
+      ...reasons.map(([value, label]) => {
+        const b = h('button', { class: 'report-reason', type: 'button', role: 'radio', 'aria-checked': 'false' }, label);
+        b.addEventListener('click', () => {
+          reason = value;
+          for (const el of choices.querySelectorAll('.report-reason')) el.setAttribute('aria-checked', String(el === b));
+          send.disabled = false;
+        });
+        return b;
+      }),
+    );
+    const close = this.host.openSheet(
+      'Report this answer',
+      h(
+        'div',
+        { class: 'sheet-body' },
+        h('p', { class: 'lede' }, 'Tell us what is wrong with this AI answer. It is sent to the Auto Browse team with your request and the page address.'),
+        choices,
+        note,
+        send,
+      ),
+    );
+    send.addEventListener('click', async () => {
+      send.disabled = true;
+      send.textContent = 'Sending…';
+      try {
+        await sendReport({ reason, note: note.value.trim(), answer, prompt, pageUrl: pageUrl ?? '' });
+        close();
+        toast('Thanks, your report was sent.');
+      } catch {
+        send.disabled = false;
+        send.textContent = 'Send report';
+        toast('Could not send the report. Try again.');
+      }
+    });
   }
 
   // ---------- question & secret cards ----------

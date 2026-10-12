@@ -1,0 +1,13 @@
+{
+  "name": "autobrowse-report-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "types": "wrangler types"
+  },
+  "devDependencies": {
+    "wrangler": "^4.149.0",
+    "typescript": "^5.9.3"
+  }
+}

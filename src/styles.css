@@ -2619,3 +2619,62 @@ body {
   color: #111;
 }
 
+
+/* Copy / Report under AI answers */
+.answer-actions {
+  display: flex;
+  gap: 2px;
+  margin-top: -4px;
+}
+
+.answer-action {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--faint);
+  display: grid;
+  place-items: center;
+}
+
+.answer-action:active {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.answer-action .icon {
+  width: 17px;
+  height: 17px;
+}
+
+.report-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.report-reason {
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 13px 14px;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.report-reason[aria-checked='true'] {
+  border-color: var(--accent);
+  background: rgba(52, 211, 153, 0.12);
+}
+
+.report-note {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 15px;
+  resize: none;
+  color: var(--text);
+}
