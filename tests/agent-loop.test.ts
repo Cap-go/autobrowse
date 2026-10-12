@@ -443,3 +443,22 @@ describe('export_file', () => {
     expect(JSON.stringify(requests.at(-1)?.input.at(-1))).toContain('"ok\\":true');
   });
 });
+
+describe('native plugin contract', () => {
+  test('openWebView options are accepted by the iOS plugin', async () => {
+    await browser.open('https://example.com');
+    const options = (browserPlugin.openWebView.mock.calls.at(-1) as unknown as [Record<string, unknown>])[0];
+    // InAppBrowserPlugin.swift rejects preShowScript unless isPresentAfterPageLoad is true.
+    if (options.preShowScript) expect(options.isPresentAfterPageLoad).toBe(true);
+    expect(options.preventDeeplink).toBe(true);
+    expect(String(options.url)).toBe('https://example.com');
+  });
+
+  test('the link guard is injected after a page load', async () => {
+    browserPlugin.executeScript.mockClear();
+    await browser.open('https://example.com/guard');
+    await new Promise((r) => setTimeout(r, 10));
+    const codes = browserPlugin.executeScript.mock.calls.map((c) => String((c as unknown as [{ code: string }])[0]?.code));
+    expect(codes.some((code) => code.includes('__autoBrowseLinkGuard'))).toBe(true);
+  });
+});

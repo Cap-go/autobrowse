@@ -139,6 +139,7 @@ export class BrowserTab {
 
   handleLoaded(): void {
     this.loading = false;
+    this.injectLinkGuard();
     for (const waiter of [...this.loadWaiters]) waiter();
     void this.refreshTitle();
     this.emit();
@@ -167,6 +168,12 @@ export class BrowserTab {
       const timer = setTimeout(done, timeoutMs);
       this.loadWaiters.push(done);
     });
+  }
+
+  /** Install the app-link guard in the current document (idempotent). */
+  private injectLinkGuard(): void {
+    if (!this.webViewId) return;
+    void InAppBrowser.executeScript({ id: this.webViewId, code: LINK_GUARD_SCRIPT }).catch(() => undefined);
   }
 
   /** Where the page is drawn (CSS px == iOS points). `null` = full screen. */
@@ -209,9 +216,10 @@ export class BrowserTab {
           }),
       ...(this.visible ? {} : { hidden: true }),
       // Links never jump to other apps on their own; app schemes are asked first.
+      // The link guard is injected after each load (see handleLoaded). Do not use
+      // preShowScript here: the plugin rejects it unless isPresentAfterPageLoad
+      // is true, which hides the page until it fully loads.
       preventDeeplink: true,
-      preShowScript: LINK_GUARD_SCRIPT,
-      preShowScriptInjectionTime: 'documentStart',
     });
     this.webViewId = result.id;
     tabsByWebView.set(result.id, this);
