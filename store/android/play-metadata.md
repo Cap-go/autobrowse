@@ -106,7 +106,7 @@ Use the utility/productivity questionnaire; final regional ratings are calculate
 | AI-generated content | Yes; optional browsing assistant |
 | Target audience | Adults (18+) |
 
-Do not copy the iOS age rating into Play; disclose unrestricted internet access and complete IARC's live questionnaire. Publication blocker: no in-app AI response reporting control exists in this build. Google Play requires users to be able to flag offensive AI content without leaving the app ([AI-generated content policy](https://support.google.com/googleplay/android-developer/answer/13985936)). A receiving report endpoint/form is needed to implement this honestly; a mailto link or a local-only flag would not satisfy it.
+Do not copy the iOS age rating into Play; disclose unrestricted internet access and complete IARC's live questionnaire. Users can flag AI answers using the in-app Report sheet, without leaving the app, as required by the [AI-generated content policy](https://support.google.com/googleplay/android-developer/answer/13985936). See Generative AI policy below.
 
 ## App access / reviewer instructions
 
@@ -129,3 +129,10 @@ Every AI answer has a **Report** button (flag icon) that opens an in-app sheet
 (reason + optional details). Reports are sent without leaving the app to
 `workers/report` (Cloudflare Worker, https://autobrowse-report.digitalshift-ee.workers.dev/report),
 which emails them to tori@capgo.app.
+
+Verified on 2026-10-13 with one clearly labelled synthetic QA report submitted
+through the real in-app sheet in a headless browser. The live endpoint returned
+HTTP 200 with `{"ok":true}` after Cloudflare accepted the email; the sheet closed
+and the app remained on the same page. Inbox receipt was not independently checked.
+Reports are limited to five requests per minute per IP. Invalid JSON returns 400;
+email failure returns 502 and the app allows retrying.

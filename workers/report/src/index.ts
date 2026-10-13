@@ -1,8 +1,3 @@
-interface Env {
-  EMAIL: SendEmail;
-  LIMITER: RateLimit;
-}
-
 const TO = 'tori@capgo.app';
 const FROM = { email: 'autobrowse-reports@capgo.app', name: 'Auto Browse reports' };
 const REASONS = ['offensive', 'harmful', 'wrong', 'other'] as const;
@@ -32,22 +27,25 @@ export default {
 
     const raw = await request.text();
     if (raw.length > 40_000) return json({ error: 'too_large' }, 413);
-    let body: Record<string, unknown>;
+    let body: unknown;
     try {
-      body = JSON.parse(raw) as Record<string, unknown>;
+      body = JSON.parse(raw);
     } catch {
       return json({ error: 'invalid_json' }, 400);
     }
 
-    const reason = REASONS.find((r) => r === body.reason) ?? 'other';
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) return json({ error: 'invalid_json' }, 400);
+
+    const field = (key: string): unknown => Object.getOwnPropertyDescriptor(body, key)?.value;
+    const reason = REASONS.find((r) => r === field('reason')) ?? 'other';
     const report = {
       reason,
-      note: clip(body.note, 1_000),
-      answer: clip(body.answer, 12_000),
-      prompt: clip(body.prompt, 4_000),
-      pageUrl: clip(body.pageUrl, 500),
-      appVersion: clip(body.appVersion, 40),
-      platform: clip(body.platform, 20),
+      note: clip(field('note'), 1_000),
+      answer: clip(field('answer'), 12_000),
+      prompt: clip(field('prompt'), 4_000),
+      pageUrl: clip(field('pageUrl'), 500),
+      appVersion: clip(field('appVersion'), 40),
+      platform: clip(field('platform'), 20),
     };
     if (!report.answer) return json({ error: 'missing_answer' }, 400);
 
@@ -72,7 +70,7 @@ export default {
         text,
       });
     } catch (error) {
-      console.error('report email failed', (error as { code?: string }).code, (error as Error).message);
+      console.error('report email failed', error instanceof Error ? error.message : 'Unknown email error');
       return json({ error: 'send_failed' }, 502);
     }
     return json({ ok: true });
