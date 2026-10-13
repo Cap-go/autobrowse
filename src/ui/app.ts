@@ -4,6 +4,7 @@ import { loadLatestCredentials, signOut } from '../auth/token-store';
 import type { OAuthCredentialRecord } from '../auth/types';
 import { APP_LINKS, PREF_KEYS } from '../config';
 import { parseDeepLink } from '../deeplink';
+import { hasAiConsent, requestAiConsent, setAiConsent } from './ai-consent';
 import { BrowserScreen } from './browser-screen';
 import { h, icon } from './dom';
 import { friendlyError, openExternal, row, toast } from './helpers';
@@ -34,7 +35,7 @@ const ONBOARDING = [
   {
     art: 'shield' as const,
     title: 'Private by design',
-    body: 'Your ChatGPT sign in stays in secure device storage. No Capgo account, no tracking, no ads.',
+    body: 'Your sign in stays in secure device storage. Nothing goes to OpenAI until you allow it. No tracking, no ads.',
   },
 ];
 
@@ -48,6 +49,7 @@ export class App {
     openSignIn: () => this.openSignInSheet(),
     openSettings: () => void this.openSettings(),
     openSheet: (title, content) => this.openSheet(title, content),
+    requestAiConsent: () => requestAiConsent((title, content, onClose) => this.openSheet(title, content, onClose)),
   });
 
   constructor(root: HTMLElement) {
@@ -219,6 +221,7 @@ export class App {
       try {
         this.creds = await completeSignIn();
         this.go('main');
+        this.askAiConsent();
       } catch (error) {
         status.className = 'status error';
         status.textContent = friendlyError(error);
@@ -272,7 +275,7 @@ export class App {
 
   // ---------- Sheets ----------
 
-  private openSheet(title: string, content: HTMLElement): () => void {
+  private openSheet(title: string, content: HTMLElement, onClose?: () => void): () => void {
     const sheet = h(
       'div',
       { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
@@ -292,6 +295,7 @@ export class App {
     const close = (): void => {
       if (closed) return;
       closed = true;
+      onClose?.();
       this.sheets = this.sheets.filter((fn) => fn !== close);
       this.screenView.showPages();
       backdrop.classList.add('closing');
@@ -337,12 +341,19 @@ export class App {
         this.creds = await completeSignIn();
         close();
         this.go('main');
+        this.askAiConsent();
       } catch (error) {
         status.className = 'status error';
         status.textContent = friendlyError(error);
         btn.disabled = false;
       }
     });
+  }
+
+  /** Right after sign in, before the first task, ask to share data with OpenAI. */
+  private askAiConsent(): void {
+    if (hasAiConsent()) return;
+    void requestAiConsent((title, content, onClose) => this.openSheet(title, content, onClose));
   }
 
   async openSettings(): Promise<void> {
@@ -378,6 +389,21 @@ export class App {
         }),
       ),
     );
+
+    const consentRow = (): HTMLElement => {
+      const allowed = hasAiConsent();
+      const r = row(`Share data with OpenAI: ${allowed ? 'On' : 'Off'}`, 'chevron', async () => {
+        if (hasAiConsent()) {
+          setAiConsent(false);
+          toast('Data sharing with OpenAI is off. The agent will ask again before the next task.');
+        } else {
+          await requestAiConsent((title, content, onClose) => this.openSheet(title, content, onClose));
+        }
+        r.replaceWith(consentRow());
+      });
+      return r;
+    };
+    rows.append(group('AI data sharing', consentRow()));
 
     await vault.load();
     const secrets = vault.list().filter((secret) => secret.remembered);

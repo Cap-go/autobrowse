@@ -24,12 +24,15 @@ import { renderMarkdown } from './markdown';
 import { copyText, fileCard } from './export';
 import { sendReport } from './report';
 import { VoiceInput } from './voice';
+import { hasAiConsent } from './ai-consent';
 
 export interface BrowserScreenHost {
   creds(): OAuthCredentialRecord | null;
   openSignIn(): void;
   openSettings(): void;
   openSheet(title: string, content: HTMLElement): () => void;
+  /** Resolves true once the user allowed sending data to OpenAI. */
+  requestAiConsent(): Promise<boolean>;
 }
 
 /** split: page above chat · chat: page hidden · page: chat folded to the composer */
@@ -785,6 +788,18 @@ export class BrowserScreen {
     }
     const tab = this.active;
     if (tab.busy) return;
+    if (!hasAiConsent()) {
+      // Nothing is sent to OpenAI before an explicit "Allow" (guideline 5.1.2(i)).
+      void this.host.requestAiConsent().then((allowed) => {
+        if (allowed) this.submit(text);
+        else {
+          this.input.value = text;
+          autoGrow(this.input);
+          this.syncComposer();
+        }
+      });
+      return;
+    }
     // Show the conversation so the reply is visible (also from the collapsed pill).
     if (tab.mode !== 'split') this.setMode(tab, 'split');
     // The page must have a frame before the agent opens it.

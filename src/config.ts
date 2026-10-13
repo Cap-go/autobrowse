@@ -38,6 +38,7 @@ export const APP_LINKS = {
   terms: 'https://capgo.app/tos/',
   support: 'https://capgo.app/contact/',
   openaiUsage: 'https://openai.com/policies/usage-policies/',
+  openaiPrivacy: 'https://openai.com/policies/privacy-policy/',
   capgo: 'https://capgo.app/?utm_source=autobrowse&utm_medium=app&utm_campaign=settings',
   makerX: 'https://x.com/martindonadieu',
 } as const;
@@ -45,6 +46,8 @@ export const APP_LINKS = {
 /** Non-secret UI preferences (localStorage is fine here; never store tokens). */
 export const PREF_KEYS = {
   onboarded: 'capgo_browser_onboarded_v1',
+  /** User allowed sending prompts and page content to OpenAI (guideline 5.1.2(i)). */
+  aiConsent: 'capgo_browser_ai_consent_v1',
 } as const;
 
 /** Receives "Report this answer" (workers/report). */
