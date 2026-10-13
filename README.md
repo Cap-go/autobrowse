@@ -70,6 +70,8 @@ Private Capgo repository. See LICENSE if present.
 
 Everything needed for App Store Connect lives in `store/`:
 
+- `store/creative/apple/`: Header and Search Results artwork, generation tool instructions and verified App Store Connect draft assignments.
+
 - `store/metadata.md`: name, subtitle, description, keywords, age rating, privacy label, review notes
 - `website/`: https://autobrowse.dev (landing, privacy, terms, support, deep links, app-link files). `bun run site:deploy`
 - `store/icon/`: 1024 icon source (`icon.svg`) and PNG

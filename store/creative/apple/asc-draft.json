@@ -1,0 +1,46 @@
+{
+  "appId": "6821215230",
+  "bundleId": "app.capgo.browser",
+  "versionId": "da7d1491-c53a-4d14-a9e8-bee717b0ca69",
+  "localeId": "708b30c8-8a08-4cae-a9e1-2c0c6ea7b00e",
+  "assets": [
+    {
+      "file": "product-page-header-3840x1646.png",
+      "label": "Auto Browse Header - flat green",
+      "placementType": "PRODUCT_PAGE_HEADER_ASSET",
+      "width": 3840,
+      "height": 1646,
+      "sha256": "6cbfe525623332cb6cf6cbb97592737e5265d0e881920dbad761fbdf4273de52",
+      "assetId": "d9800019-6937-8bfe-801f-4decc740e079",
+      "assetState": "PREPARE_FOR_SUBMISSION",
+      "placementId": "59c00019-6937-8bfe-8f21-1ba9286a7a82",
+      "placementState": "ACTIVE",
+      "specId": "1eb43b80-e0b7-4d96-bd32-47a42a8c5fed",
+      "dimensions": {
+        "width": 3840,
+        "height": 1646
+      }
+    },
+    {
+      "file": "search-results-3840x2560.png",
+      "label": "Auto Browse Search Results - flat green",
+      "placementType": "APP_STORE_SEARCH_RESULTS_ASSET",
+      "width": 3840,
+      "height": 2560,
+      "sha256": "b468a2c3713c9a5ac7fa2d32c23c2e68bd5fac846f51601c820a3de60407d2c1",
+      "assetId": "d4c00019-6937-8bfe-8006-ecb5d32eb5d1",
+      "assetState": "PREPARE_FOR_SUBMISSION",
+      "placementId": "0cc00019-6937-8bfe-8f24-78a296b1934a",
+      "placementState": "ACTIVE",
+      "specId": "d2ffa3b7-6c55-5cdf-8512-229d92791333",
+      "dimensions": {
+        "width": 3840,
+        "height": 2560
+      }
+    }
+  ],
+  "verifiedAt": "2026-10-13T12:53:23.728Z",
+  "appVersion": "1.0.0",
+  "appVersionState": "REJECTED",
+  "submittedForReview": false
+}
