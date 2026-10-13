@@ -1,7 +1,7 @@
 # Deep links
 
 Other apps, web pages, ChatGPT answers, Shortcuts, emails or QR codes can open
-Auto Browse and prepare a task. Public docs: https://capgo.app/autobrowse/deeplinks/
+Auto Browse and prepare a task. Public docs: https://autobrowse.dev/deeplinks/
 
 ## Formats
 
@@ -9,8 +9,8 @@ Auto Browse and prepare a task. Public docs: https://capgo.app/autobrowse/deepli
 | --- | --- |
 | `autobrowse://run?prompt=…&url=…` | New tab, loads `url` (optional), offers `prompt` with a Start card |
 | `autobrowse://open?url=…` | New tab with `url` |
-| `https://capgo.app/autobrowse/run?…` | Same as `run` (universal link; falls back to a web page when the app is not installed) |
-| `https://capgo.app/autobrowse/open?…` | Same as `open` |
+| `https://autobrowse.dev/run?…` | Same as `run` (universal link; falls back to a web page when the app is not installed) |
+| `https://autobrowse.dev/open?…` | Same as `open` |
 
 Parameters:
 
@@ -19,7 +19,7 @@ Parameters:
 - `tab`: `new` (default) or `current`. A blank current tab is reused.
 
 ```js
-const link = 'https://capgo.app/autobrowse/run?' + new URLSearchParams({
+const link = 'https://autobrowse.dev/run?' + new URLSearchParams({
   prompt: 'Summarize this page in 5 bullets',
   url: 'https://news.ycombinator.com',
 });
@@ -37,11 +37,12 @@ If the user is not signed in, Start asks them to sign in first.
 - Parser and validation: `src/deeplink.ts` (tests in `tests/deeplink.test.ts`)
 - Handling: `App.handleDeepLink` → `BrowserScreen.handleDeepLink`
 - Listeners: `appUrlOpen` (warm start) and `getLaunchUrl()` (cold start) in `src/main.ts`
-- iOS: `CFBundleURLTypes` (`autobrowse`) in `Info.plist`, `applinks:capgo.app` in
-  `App/App.entitlements` (Associated Domains capability enabled on the App ID)
+- iOS: `CFBundleURLTypes` (`autobrowse`) in `Info.plist`, `applinks:autobrowse.dev`
+  (and the older `applinks:capgo.app`) in `App/App.entitlements`
 - Android: intent filters in `AndroidManifest.xml`
-- Website: `apple-app-site-association` on capgo.app limited to `/autobrowse/run*`
-  and `/autobrowse/open*`, plus fallback pages for both paths.
+- Website: `website/` (deployed to https://autobrowse.dev) serves
+  `apple-app-site-association` and `assetlinks.json` for `/run*` and `/open*`,
+  plus fallback pages for both paths. Older `capgo.app/autobrowse/*` links still work.
 
 Test on a simulator:
 

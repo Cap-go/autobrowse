@@ -1,0 +1,15 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "autobrowse-site",
+  "account_id": "9ee3d7479a3c359681e3fab2c8cb22c0",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    { "pattern": "autobrowse.dev", "custom_domain": true },
+    { "pattern": "www.autobrowse.dev", "custom_domain": true }
+  ]
+}

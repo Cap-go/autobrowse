@@ -32,7 +32,16 @@
                 <data android:scheme="autobrowse" />
             </intent-filter>
 
-            <!-- https://capgo.app/autobrowse/run|open -->
+            <!-- https://autobrowse.dev/run|open -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="autobrowse.dev" android:pathPrefix="/run" />
+                <data android:scheme="https" android:host="autobrowse.dev" android:pathPrefix="/open" />
+            </intent-filter>
+
+            <!-- https://capgo.app/autobrowse/run|open (older links) -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

@@ -34,9 +34,10 @@ export const SECURE_STORAGE_KEYS = {
 } as const;
 
 export const APP_LINKS = {
-  privacy: 'https://capgo.app/privacy/',
-  terms: 'https://capgo.app/tos/',
-  support: 'https://capgo.app/contact/',
+  site: 'https://autobrowse.dev/',
+  privacy: 'https://autobrowse.dev/privacy/',
+  terms: 'https://autobrowse.dev/terms/',
+  support: 'https://autobrowse.dev/support/',
   openaiUsage: 'https://openai.com/policies/usage-policies/',
   openaiPrivacy: 'https://openai.com/policies/privacy-policy/',
   capgo: 'https://capgo.app/?utm_source=autobrowse&utm_medium=app&utm_campaign=settings',

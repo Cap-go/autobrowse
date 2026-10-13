@@ -71,7 +71,7 @@ Private Capgo repository. See LICENSE if present.
 Everything needed for App Store Connect lives in `store/`:
 
 - `store/metadata.md`: name, subtitle, description, keywords, age rating, privacy label, review notes
-- `store/legal/`: privacy policy, terms, support page (optional drafts; app uses capgo.app/privacy, /tos, /contact)
+- `website/`: https://autobrowse.dev (landing, privacy, terms, support, deep links, app-link files). `bun run site:deploy`
 - `store/icon/`: 1024 icon source (`icon.svg`) and PNG
 - `store/screenshots/`: 6.9" and 6.5" iPhone screenshots
 

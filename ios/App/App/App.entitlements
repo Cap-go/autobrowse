@@ -4,6 +4,7 @@
 <dict>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
+		<string>applinks:autobrowse.dev</string>
 		<string>applinks:capgo.app</string>
 	</array>
 </dict>

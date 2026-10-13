@@ -1,10 +1,11 @@
 /**
  * Deep links that start Auto Browse from other apps, web pages, ChatGPT,
- * Shortcuts or QR codes. Documented at https://capgo.app/autobrowse/deeplinks/
+ * Shortcuts or QR codes. Documented at https://autobrowse.dev/deeplinks/
  *
  *   autobrowse://run?prompt=…&url=https://…&tab=new|current
  *   autobrowse://open?url=https://…
- *   https://capgo.app/autobrowse/run?… and /autobrowse/open?… (universal links)
+ *   https://autobrowse.dev/run?… and /open?… (universal links)
+ *   https://capgo.app/autobrowse/run?… and /autobrowse/open?… (older links, still accepted)
  */
 export interface DeepLinkAction {
   action: 'run' | 'open';
@@ -14,7 +15,8 @@ export interface DeepLinkAction {
 }
 
 export const DEEPLINK_SCHEME = 'autobrowse';
-export const DEEPLINK_HOSTS = ['capgo.app', 'www.capgo.app'];
+export const DEEPLINK_HOSTS = ['autobrowse.dev', 'www.autobrowse.dev'];
+const LEGACY_HOSTS = ['capgo.app', 'www.capgo.app'];
 const MAX_PROMPT = 2000;
 
 export function parseDeepLink(raw: string): DeepLinkAction | null {
@@ -30,8 +32,9 @@ export function parseDeepLink(raw: string): DeepLinkAction | null {
     // autobrowse://run?… parses with host "run"; autobrowse:run?… with pathname "run".
     action = link.host || link.pathname.replace(/^\/+/, '');
   } else if (link.protocol === 'https:' && DEEPLINK_HOSTS.includes(link.hostname)) {
-    const match = link.pathname.match(/^\/autobrowse\/(run|open)\/?$/);
-    action = match?.[1];
+    action = link.pathname.match(/^\/(run|open)\/?$/)?.[1];
+  } else if (link.protocol === 'https:' && LEGACY_HOSTS.includes(link.hostname)) {
+    action = link.pathname.match(/^\/autobrowse\/(run|open)\/?$/)?.[1];
   }
   action = action?.replace(/\/+$/, '').toLowerCase();
   if (action !== 'run' && action !== 'open') return null;

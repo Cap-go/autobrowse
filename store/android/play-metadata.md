@@ -10,8 +10,8 @@
 | Release | 1.0.0 (versionCode 1) |
 | Category | Productivity |
 | Contact email | tori@capgo.app |
-| Privacy policy | https://capgo.app/privacy/ |
-| Website / support | https://capgo.app/contact/ |
+| Privacy policy | https://autobrowse.dev/privacy/ |
+| Website | https://autobrowse.dev/ |
 | Ads | No |
 | In-app purchases | No |
 
@@ -54,8 +54,8 @@ Use Auto Browse as a normal browser. Sign in when you want the agent.
 
 Auto Browse is made by Capgo. It is not affiliated with or endorsed by OpenAI. ChatGPT is a trademark of OpenAI.
 
-Terms of Use: https://capgo.app/tos/
-Privacy Policy: https://capgo.app/privacy/
+Terms of Use: https://autobrowse.dev/terms/
+Privacy Policy: https://autobrowse.dev/privacy/
 
 ## Assets
 

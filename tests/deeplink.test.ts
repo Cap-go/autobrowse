@@ -16,6 +16,15 @@ describe('parseDeepLink', () => {
     );
   });
 
+  test('autobrowse.dev universal links', () => {
+    expect(parseDeepLink('https://autobrowse.dev/run?prompt=hi')).toEqual({
+      action: 'run', prompt: 'hi', url: undefined, tab: 'new',
+    });
+    expect(parseDeepLink('https://www.autobrowse.dev/open/?url=https://example.com')?.url).toBe('https://example.com/');
+    expect(parseDeepLink('https://autobrowse.dev/autobrowse/run?prompt=hi')).toBeNull();
+    expect(parseDeepLink('https://capgo.app/run?prompt=hi')).toBeNull();
+  });
+
   test('rejects unsafe or unrelated links', () => {
     expect(parseDeepLink('autobrowse://open?url=javascript:alert(1)')).toBeNull();
     expect(parseDeepLink('autobrowse://open?url=http://insecure.example')).toBeNull();
