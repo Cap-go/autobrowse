@@ -68,10 +68,40 @@ interface Tab {
 }
 
 const SUGGESTIONS = [
-  { title: 'Compare prices', prompt: 'Find the best price for a 27 inch 4K monitor and list the top 3 stores.' },
-  { title: 'Summarize news', prompt: 'Open Hacker News and summarize the top 5 stories.' },
-  { title: 'Plan a trip', prompt: 'Find 3 well rated cafés near the Louvre in Paris.' },
-  { title: 'Read for me', prompt: 'Open wikipedia.org and explain what Capacitor JS is in 3 bullets.' },
+  {
+    title: 'Export to CSV',
+    hint: 'Top 10 earbuds on Amazon, saved as CSV',
+    prompt:
+      'Find the 10 best rated wireless earbuds under $100 on Amazon and export name, price, rating and link as a CSV file.',
+  },
+  {
+    title: 'Fill a form',
+    hint: 'Order a pizza, it asks only what it needs',
+    prompt:
+      'Open httpbin.org/forms/post and order a large pizza with bacon and cheese, delivered at 19:00. Ask me for my name, phone and email, then fill everything in.',
+  },
+  {
+    title: 'Get my account data',
+    hint: 'GitHub repos to CSV, password kept secure',
+    prompt:
+      'Log in to github.com, ask me for my password securely, then export my repositories with stars and last update as a CSV.',
+  },
+  {
+    title: 'Compare prices',
+    hint: 'Best price for a 4K monitor on 3 stores',
+    prompt: 'Compare the price of a 27 inch 4K monitor on 3 stores and tell me where to buy it, with links.',
+  },
+  {
+    title: 'Page to table',
+    hint: 'Hacker News top 20 with points and links',
+    prompt:
+      'Open Hacker News and export the top 20 stories with title, points, comments and link as a CSV file.',
+  },
+  {
+    title: 'Summarize',
+    hint: 'Top 5 news stories in one minute',
+    prompt: 'Open Hacker News and summarize the top 5 stories in one short line each.',
+  },
 ];
 
 const QUICK_SITES = [
@@ -727,7 +757,7 @@ export class BrowserScreen {
             'button',
             { class: 'starter', type: 'button', onclick: () => this.submit(s.prompt) },
             h('strong', {}, s.title),
-            h('span', {}, s.prompt),
+            h('span', {}, s.hint),
           ),
         ),
       ),
