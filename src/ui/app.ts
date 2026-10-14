@@ -223,6 +223,11 @@ export class App {
     button.addEventListener('click', async () => {
       button.disabled = true;
       status.className = 'status';
+      status.textContent = '';
+      if (!(await this.consentBeforeSignIn(status))) {
+        button.disabled = false;
+        return;
+      }
       status.textContent = 'Opening ChatGPT sign in…';
       try {
         setCredentials(await completeSignIn());
@@ -342,6 +347,11 @@ export class App {
     btn.addEventListener('click', async () => {
       btn.disabled = true;
       status.className = 'status';
+      status.textContent = '';
+      if (!(await this.consentBeforeSignIn(status))) {
+        btn.disabled = false;
+        return;
+      }
       status.textContent = 'Opening ChatGPT sign in…';
       try {
         setCredentials(await completeSignIn());
@@ -357,12 +367,21 @@ export class App {
   }
 
   /**
-   * Right after sign in: send the task the user already chose (it asks for
-   * consent itself), or ask to share data with OpenAI before the first task.
+   * Signing in only exists to let OpenAI run the agent, so the data sharing
+   * screen comes first (guideline 5.1.2(i)). Declining keeps guest browsing.
    */
+  private async consentBeforeSignIn(status: HTMLElement): Promise<boolean> {
+    const allowed = await requestAiConsent((title, content, onClose) => this.openSheet(title, content, onClose));
+    if (!allowed) {
+      status.className = 'status';
+      status.textContent = 'The agent needs your OK to share data with OpenAI. You can still browse without signing in.';
+    }
+    return allowed;
+  }
+
+  /** Right after sign in: send the task the user already chose. */
   private afterSignIn(): void {
-    if (this.screenView.resumeAfterSignIn() || hasAiConsent()) return;
-    void requestAiConsent((title, content, onClose) => this.openSheet(title, content, onClose));
+    this.screenView.resumeAfterSignIn();
   }
 
   /** Sign out removes everything tied to this person, so the next user starts clean. */
