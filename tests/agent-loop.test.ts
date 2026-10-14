@@ -266,6 +266,34 @@ describe('agent loop', () => {
     expect(requests).toHaveLength(1);
     expect(result.assistantText).not.toContain('never');
   });
+
+  test('stopping between parallel tools skips the rest but answers every call', async () => {
+    responses.push(sse([completed([call('a', 'browser_scroll', { deltaY: 100 }), call('b', 'browser_scroll', { deltaY: 200 })])]));
+    let stop = false;
+    const checkpoints: number[] = [];
+    const result = await runAgentTurn(creds, createInitialState('Two'), {
+      shouldStop: () => stop,
+      onToolEnd: () => {
+        stop = true;
+      },
+      onCheckpoint: (state) => checkpoints.push(state.messages.length),
+    });
+    expect(requests).toHaveLength(1);
+    const outputs = result.state.messages.filter((m) => 'type' in m && m.type === 'function_call_output');
+    expect(outputs).toHaveLength(2);
+    expect(JSON.stringify(outputs[1])).toContain('Stopped by the user');
+    expect(checkpoints.length).toBeGreaterThan(0);
+  });
+
+  test('aborting drops the model request in flight', async () => {
+    const controller = new AbortController();
+    fetchSpy.mockImplementationOnce(Object.assign(() => new Promise<Response>(() => undefined), { preconnect: () => undefined }) as unknown as typeof fetch);
+    const run = runAgentTurn(creds, createInitialState('Hang'), { signal: controller.signal });
+    // Abort once the request is in flight.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    controller.abort();
+    await expect(run).rejects.toThrow('Stopped.');
+  });
 });
 
 describe('browser lifecycle', () => {

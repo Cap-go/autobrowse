@@ -111,7 +111,15 @@ export function friendlyError(error: unknown): string {
     return 'You are offline. Check your connection and try again.';
   }
   if (/network connection was lost|load failed|timed out/i.test(message)) {
-    return `The connection dropped while the agent was working (${message}). Send "continue" to pick up where it stopped.`;
+    return 'The connection dropped while the agent was working. Tap Continue to pick up where it stopped.';
+  }
+  if (/token refresh failed|invalid_token|signed out/i.test(message)) {
+    return 'Your ChatGPT sign in expired. Tap Reconnect ChatGPT to keep going.';
+  }
+  // Server replies can be long JSON: show the status, not the raw body.
+  const api = /Responses API error \((\d+)\)/.exec(message);
+  if (api) {
+    return `ChatGPT could not answer right now (error ${api[1]}). Tap Continue to try again.`;
   }
   return message || 'Something went wrong. Please try again.';
 }

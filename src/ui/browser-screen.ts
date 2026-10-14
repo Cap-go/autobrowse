@@ -1,5 +1,5 @@
 import type { OAuthCredentialRecord } from '../auth/types';
-import { appendUserMessage, createInitialState, runAgentTurn, type AgentLoopState } from '../agent/loop';
+import { appendUserMessage, createInitialState, runAgentTurn, StoppedError, type AgentLoopState } from '../agent/loop';
 import { AppLauncher } from '@capacitor/app-launcher';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
@@ -58,6 +58,13 @@ interface Tab {
   unread: boolean;
   /** URL to open once the tab is on screen (links that arrive before render). */
   pendingUrl?: string;
+  /** Unsent composer text, kept per tab. */
+  draft: string;
+  /** Bumped by Stop/New chat/close: a run that finishes later must not touch the tab. */
+  runId: number;
+  abort?: AbortController;
+  /** A question or secure card waits for the user. */
+  waiting: boolean;
 }
 
 const SUGGESTIONS = [
@@ -89,6 +96,8 @@ export class BrowserScreen {
   private sheetsOpen = 0;
   private offscreen = false;
   private cleanups: Array<() => void> = [];
+  /** Task typed before signing in; sent once the user is signed in. */
+  private pendingPrompt: { tab: Tab; text: string; url?: string } | null = null;
 
   // Elements of the current render.
   private section!: HTMLElement;
@@ -300,13 +309,42 @@ export class BrowserScreen {
 
   /** Close every tab (sign out, clear data) and start fresh. */
   async reset(): Promise<void> {
-    for (const tab of this.tabs) {
-      tab.stopRequested = true;
-      tab.cancelPending?.();
-      await tab.browser.close();
-    }
+    const tabs = this.tabs;
     this.tabs = [];
+    this.pendingPrompt = null;
+    for (const tab of tabs) {
+      this.stopTab(tab);
+      await tab.browser.dispose();
+    }
     this.active = this.createTab();
+  }
+
+  /** Stop every running agent now (consent turned off, sign out). */
+  stopAll(): number {
+    const running = this.tabs.filter((tab) => tab.busy);
+    for (const tab of running) this.stopTab(tab);
+    return running.length;
+  }
+
+  /** Stop the tab's agent: abort the request, skip queued actions, close open cards. */
+  private stopTab(tab: Tab): void {
+    tab.stopRequested = true;
+    tab.abort?.abort();
+    tab.cancelPending?.();
+  }
+
+  /** After a successful sign in, send the task the user tried before. Returns true when one was sent. */
+  resumeAfterSignIn(): boolean {
+    const pending = this.pendingPrompt;
+    this.pendingPrompt = null;
+    if (!pending || !this.tabs.includes(pending.tab)) return false;
+    if (pending.tab !== this.active && this.section) this.showTab(pending.tab);
+    if (this.input?.value.trim() === pending.text) {
+      this.input.value = '';
+      autoGrow(this.input);
+    }
+    this.submit(pending.text, pending.url);
+    return true;
   }
 
   /**
@@ -317,16 +355,19 @@ export class BrowserScreen {
   handleDeepLink(link: DeepLinkAction): void {
     const current = this.active;
     const blank = !current.browser.url && !current.agentState && !current.busy;
-    const tab = link.tab === 'current' || blank ? current : this.createTab();
+    // Never take over a tab the agent is working in.
+    const tab = !current.busy && (link.tab === 'current' || blank) ? current : this.createTab();
     if (tab !== this.active && this.section) this.showTab(tab);
     else if (tab !== this.active) this.active = tab;
-    if (link.url) this.openUrl(tab, link.url);
     if (link.action === 'run' && link.prompt) {
+      // A task link opens nothing until the user taps Start.
       tab.log.querySelector('.welcome')?.remove();
       tab.log.querySelector('.link-card')?.remove();
       tab.log.append(this.renderLinkCard(tab, link.prompt, link.url));
       scrollToEnd(tab.log);
+      return;
     }
+    if (link.url) this.openUrl(tab, link.url);
   }
 
   private renderLinkCard(tab: Tab, prompt: string, url?: string): HTMLElement {
@@ -341,17 +382,18 @@ export class BrowserScreen {
     const edit = h('button', { class: 'secondary', type: 'button' }, 'Edit');
     const dismiss = h('button', { class: 'ghost', type: 'button' }, 'Dismiss');
     start.addEventListener('click', () => {
-      if (!this.host.creds()) {
-        this.host.openSignIn();
+      if (tab.busy) {
+        toast('The agent is still working in this tab. Stop it or wait, then tap Start.');
         return;
       }
       card.remove();
       if (tab !== this.active) this.showTab(tab);
-      this.submit(prompt);
+      this.submit(prompt, url);
     });
     edit.addEventListener('click', () => {
       card.remove();
       if (tab !== this.active) this.showTab(tab);
+      if (url) this.openUrl(tab, url);
       this.input.value = prompt;
       autoGrow(this.input);
       this.syncComposer();
@@ -381,6 +423,9 @@ export class BrowserScreen {
       lastText: '',
       liveStatus: '',
       unread: false,
+      draft: '',
+      runId: 0,
+      waiting: false,
     };
     let thumbTimer: ReturnType<typeof setTimeout> | undefined;
     tab.browser.onChange((b) => {
@@ -412,16 +457,22 @@ export class BrowserScreen {
   }
 
   private async closeTab(tab: Tab): Promise<void> {
-    tab.stopRequested = true;
-    tab.cancelPending?.();
-    await tab.browser.close();
+    this.stopTab(tab);
+    tab.runId += 1;
     this.tabs = this.tabs.filter((t) => t !== tab);
+    await tab.browser.dispose();
     if (!this.tabs.length) this.createTab();
     if (tab === this.active) this.showTab(this.tabs[this.tabs.length - 1]!);
     else this.syncTabsButton();
   }
 
   private showTab(tab: Tab): void {
+    // The composer is shared: keep each tab's unsent text with its tab.
+    if (this.input && this.active !== tab) {
+      if (this.tabs.includes(this.active)) this.active.draft = this.input.value;
+      this.input.value = tab.draft;
+      autoGrow(this.input);
+    }
     this.active = tab;
     this.chatHost.replaceChildren(tab.log);
     if (!tab.log.childElementCount) tab.log.append(this.renderWelcome());
@@ -706,14 +757,14 @@ export class BrowserScreen {
       e.preventDefault();
       const tab = this.active;
       if (tab.busy) {
-        tab.stopRequested = true;
-        tab.cancelPending?.();
+        this.stopTab(tab);
         this.send.disabled = true;
         return;
       }
       const text = this.input.value.trim();
       if (!text) return;
       this.input.value = '';
+      tab.draft = '';
       autoGrow(this.input);
       this.submit(text);
     });
@@ -747,16 +798,25 @@ export class BrowserScreen {
         mic.replaceChildren(icon('mic'));
         this.syncComposer();
       };
+      // Dictation belongs to the tab it started in, and only fills the composer:
+      // the user reviews the text and taps Send.
+      const owner = this.active;
+      const before = this.input.value.trim();
+      const join = (heard: string): string => [before, heard].filter(Boolean).join(' ');
+      const write = (value: string): void => {
+        if (owner === this.active) {
+          this.input.value = value;
+          autoGrow(this.input);
+        } else {
+          owner.draft = value;
+        }
+      };
       mic.classList.add('listening');
       mic.replaceChildren(icon('stop'));
-      this.input.value = '';
       this.input.placeholder = 'Listening… tap ■ when done';
       try {
         await voice.start({
-          onPartial: (text) => {
-            this.input.value = text;
-            autoGrow(this.input);
-          },
+          onPartial: (text) => write(join(text)),
           onLevel: (level) => {
             // level is ~0..1 (Android dB values are clamped).
             const v = Math.max(0, Math.min(1, level > 1 ? level / 10 : level));
@@ -764,9 +824,8 @@ export class BrowserScreen {
           },
           onEnd: (text) => {
             reset();
-            this.input.value = '';
-            autoGrow(this.input);
-            if (text) this.submit(text);
+            write(join(text));
+            if (text && owner === this.active) this.input.focus();
           },
           onError: (message) => {
             reset();
@@ -780,23 +839,33 @@ export class BrowserScreen {
     });
   }
 
-  private submit(text: string): void {
+  /** Send a task to the active tab's agent. `startUrl` is where a link task begins. */
+  private submit(text: string, startUrl?: string): void {
+    const tab = this.active;
+    const restore = (): void => {
+      if (tab !== this.active) {
+        tab.draft = text;
+        return;
+      }
+      this.input.value = text;
+      autoGrow(this.input);
+      this.syncComposer();
+    };
     const creds = this.host.creds();
     if (!creds) {
+      // Keep the task: it is sent right after sign in.
+      this.pendingPrompt = { tab, text, url: startUrl };
+      restore();
       this.host.openSignIn();
       return;
     }
-    const tab = this.active;
     if (tab.busy) return;
     if (!hasAiConsent()) {
       // Nothing is sent to OpenAI before an explicit "Allow" (guideline 5.1.2(i)).
       void this.host.requestAiConsent().then((allowed) => {
-        if (allowed) this.submit(text);
-        else {
-          this.input.value = text;
-          autoGrow(this.input);
-          this.syncComposer();
-        }
+        if (!allowed) restore();
+        else if (tab === this.active) this.submit(text, startUrl);
+        else restore();
       });
       return;
     }
@@ -804,10 +873,14 @@ export class BrowserScreen {
     if (tab.mode !== 'split') this.setMode(tab, 'split');
     // The page must have a frame before the agent opens it.
     this.syncFrame();
-    void this.runTurn(tab, creds, text);
+    if (startUrl && !tab.browser.isOpen) this.openUrl(tab, startUrl);
+    void this.runTurn(tab, creds, text, startUrl);
   }
 
-  private async runTurn(tab: Tab, creds: OAuthCredentialRecord, text: string): Promise<void> {
+  private async runTurn(tab: Tab, creds: OAuthCredentialRecord, text: string, startUrl?: string): Promise<void> {
+    const runId = ++tab.runId;
+    const abort = new AbortController();
+    tab.abort = abort;
     tab.busy = true;
     tab.stopRequested = false;
     tab.lastText = text;
@@ -843,8 +916,9 @@ export class BrowserScreen {
     };
 
     // Give the model the page this tab shows.
-    const pageUrl = tab.browser.isOpen ? tab.browser.url : null;
+    const pageUrl = tab.browser.isOpen ? tab.browser.url : (startUrl ?? null);
     const modelText = pageUrl ? `${text}\n\n(The browser currently shows ${pageUrl})` : text;
+    const current = (): boolean => tab.runId === runId;
 
     try {
       const state = tab.agentState ? appendUserMessage(tab.agentState, modelText) : createInitialState(modelText);
@@ -852,7 +926,12 @@ export class BrowserScreen {
         creds,
         state,
         {
-          shouldStop: () => tab.stopRequested,
+          shouldStop: () => tab.stopRequested || !current(),
+          signal: abort.signal,
+          // Save progress as it happens, so a dropped connection keeps the work done.
+          onCheckpoint: (checkpoint) => {
+            if (current()) tab.agentState = checkpoint;
+          },
           onAssistantDelta: (delta) => {
             streamed += delta;
             renderAnswer(streamed);
@@ -885,6 +964,7 @@ export class BrowserScreen {
         },
         tab.browser,
       );
+      if (!current()) return;
       tab.agentState = result.state;
       const final = result.assistantText || streamed || (tab.stopRequested ? 'Stopped.' : 'Done.');
       renderAnswer(final);
@@ -894,23 +974,57 @@ export class BrowserScreen {
       tab.lastText = final.replace(/\s+/g, ' ').slice(0, 120);
       if (tab !== this.active) toast(`Tab ${this.tabs.indexOf(tab) + 1}: agent finished`);
     } catch (error) {
-      answer.classList.add('error');
-      answer.textContent = friendlyError(error);
-      tab.lastText = answer.textContent;
+      if (!current()) return;
+      if (error instanceof StoppedError || tab.stopRequested) {
+        renderAnswer(streamed || 'Stopped.');
+        tab.lastText = 'Stopped.';
+      } else {
+        answer.classList.add('error');
+        answer.textContent = friendlyError(error);
+        tab.lastText = answer.textContent;
+        turn.append(this.recoveryActions(tab, error));
+      }
     } finally {
+      if (tab.abort === abort) tab.abort = undefined;
       thinking.remove();
       steps.finish();
-      tab.busy = false;
-      tab.liveStatus = '';
-      if (tab.mode === 'page' || tab !== this.active) tab.unread = true;
-      if (tab === this.active) this.syncPill();
-      scrollToEnd(log);
-      if (tab === this.active) this.syncComposer();
-      this.syncTabsButton();
+      // A newer run (after New chat) owns the tab state now.
+      if (current()) {
+        tab.waiting = false;
+        tab.busy = false;
+        tab.liveStatus = '';
+        if (tab.mode === 'page' || tab !== this.active) tab.unread = true;
+        if (tab === this.active) this.syncPill();
+        scrollToEnd(log);
+        if (tab === this.active) this.syncComposer();
+        this.syncTabsButton();
+      }
     }
   }
 
   // ---------- answer actions (copy / report) ----------
+
+  /** After a failure: continue from the saved progress, or sign in again. */
+  private recoveryActions(tab: Tab, error: unknown): HTMLElement {
+    const message = error instanceof Error ? error.message : String(error);
+    const authFailed = /token refresh failed|401|invalid_token|signed out/i.test(message);
+    const actions = h('div', { class: 'link-card-actions recovery' });
+    if (authFailed) {
+      const reconnect = h('button', { class: 'primary', type: 'button' }, 'Reconnect ChatGPT');
+      reconnect.addEventListener('click', () => this.host.openSignIn());
+      actions.append(reconnect);
+    } else {
+      const retry = h('button', { class: 'secondary', type: 'button' }, 'Continue');
+      retry.addEventListener('click', () => {
+        if (tab.busy) return;
+        actions.remove();
+        if (tab !== this.active) this.showTab(tab);
+        this.submit('Continue where you stopped.');
+      });
+      actions.append(retry);
+    }
+    return actions;
+  }
 
   /** Copy and Report under an AI answer (Google Play generative-AI policy). */
   private answerActions(answer: string, prompt: string, pageUrl: string | null): HTMLElement {
@@ -974,10 +1088,13 @@ export class BrowserScreen {
 
   /** Question from the agent: suggested answers, own answer, or skip. */
   private askCard(tab: Tab, turn: HTMLElement, before: HTMLElement, req: AskUserRequest): Promise<AskUserResult> {
+    this.flagWaiting(tab, 'has a question for you');
     return new Promise((resolve) => {
       const card = h('div', { class: 'ask-card', role: 'group', 'aria-label': 'Question from the agent' });
       const done = (answer: string | null): void => {
         tab.cancelPending = undefined;
+        tab.waiting = false;
+        this.syncTabsButton();
         card.replaceWith(
           h('div', { class: 'answered' }, icon(answer === null ? 'close' : 'check'), h('span', {}, answer === null ? 'Skipped' : answer)),
         );
@@ -1023,13 +1140,11 @@ export class BrowserScreen {
     await vault.load();
     const saved = vault.find(req.name, req.domain);
     if (saved) {
-      turn.insertBefore(
-        h('div', { class: 'answered secure' }, icon('lock'), h('span', {}, `Used your saved ${saved.label} for ${saved.domain}`)),
-        before.isConnected ? before : null,
-      );
-      return { provided: true, reused: true };
+      if (await this.confirmSavedSecret(tab, turn, before, saved.label, saved.domain)) return { provided: true, reused: true };
+      if (tab.stopRequested) return { provided: false };
     }
 
+    this.flagWaiting(tab, 'needs a password or code');
     return new Promise((resolve) => {
       const autocomplete = { password: 'current-password', otp: 'one-time-code', card: 'cc-number', text: 'off' }[req.kind];
       const field = h('input', {
@@ -1047,7 +1162,7 @@ export class BrowserScreen {
         field.type = field.type === 'password' ? 'text' : 'password';
         reveal.replaceChildren(icon(field.type === 'password' ? 'eye' : 'eyeOff'));
       });
-      const remember = h('input', { type: 'checkbox', checked: req.kind === 'password' });
+      const remember = h('input', { type: 'checkbox' });
       const save = h('button', { class: 'primary', type: 'submit', disabled: true }, 'Use securely');
       const cancel = h('button', { class: 'ghost', type: 'button' }, 'Cancel');
       field.addEventListener('input', () => {
@@ -1062,13 +1177,20 @@ export class BrowserScreen {
         h('div', { class: 'secret-field' }, field, reveal),
         req.kind === 'otp'
           ? null
-          : h('label', { class: 'secret-remember' }, remember, h('span', {}, 'Remember on this device (Keychain)')),
+          : h(
+              'label',
+              { class: 'secret-remember' },
+              remember,
+              h('span', {}, `Remember on this device (${Capacitor.getPlatform() === 'android' ? 'Android Keystore' : 'Keychain'})`),
+            ),
         h('p', { class: 'secret-note' }, 'Hidden from the AI and never added to the chat. Only the app fills it on this site.'),
         h('div', { class: 'secret-actions' }, save, cancel),
       );
 
       const finish = (provided: boolean): void => {
         tab.cancelPending = undefined;
+        tab.waiting = false;
+        this.syncTabsButton();
         field.value = '';
         card.replaceWith(
           h('div', { class: 'answered secure' }, icon(provided ? 'lock' : 'close'), h('span', {}, provided ? `${req.label} saved securely · hidden from the AI` : `${req.label} not provided`)),
@@ -1083,13 +1205,59 @@ export class BrowserScreen {
         const value = field.value;
         if (!value) return;
         save.disabled = true;
-        await vault.save({ name: req.name, label: req.label, domain: req.domain, kind: req.kind, value, remember: remember.checked && req.kind !== 'otp' });
-        finish(true);
+        const wantRemember = remember.checked && req.kind !== 'otp';
+        try {
+          const meta = await vault.save({ name: req.name, label: req.label, domain: req.domain, kind: req.kind, value, remember: wantRemember });
+          if (wantRemember && !meta.remembered) toast('Could not save it on this device. It is used for this session only.');
+          finish(true);
+        } catch {
+          save.disabled = false;
+          toast('Could not use this value. Try again.');
+        }
       });
 
       turn.insertBefore(card, before.isConnected ? before : null);
       scrollToEnd(tab.log);
       if (tab === this.active) requestAnimationFrame(() => field.focus());
+    });
+  }
+
+  /** A card in a tab that is not on screen: tell the user, and mark the tab. */
+  private flagWaiting(tab: Tab, what: string): void {
+    tab.waiting = true;
+    this.syncTabsButton();
+    if (tab !== this.active) toast(`Tab ${this.tabs.indexOf(tab) + 1} ${what}. Open it from the tabs button.`);
+  }
+
+  /** Ask before filling a remembered secret. Resolves false to enter a new value instead. */
+  private confirmSavedSecret(tab: Tab, turn: HTMLElement, before: HTMLElement, label: string, domain: string): Promise<boolean> {
+    this.flagWaiting(tab, 'wants to use a saved password');
+    return new Promise((resolve) => {
+      const use = h('button', { class: 'primary', type: 'button' }, 'Use it');
+      const other = h('button', { class: 'ghost', type: 'button' }, 'Enter a new one');
+      const card = h(
+        'div',
+        { class: 'secret-card' },
+        h('div', { class: 'secret-head' }, icon('lock'), h('strong', {}, `Use your saved ${label}?`)),
+        h('p', { class: 'secret-site' }, `For ${domain}. Hidden from the AI; only the app fills it on this site.`),
+        h('div', { class: 'secret-actions' }, use, other),
+      );
+      const done = (reuse: boolean): void => {
+        tab.cancelPending = undefined;
+        tab.waiting = false;
+        this.syncTabsButton();
+        card.replaceWith(
+          reuse
+            ? h('div', { class: 'answered secure' }, icon('lock'), h('span', {}, `Used your saved ${label} for ${domain}`))
+            : h('div', { class: 'answered' }, icon('close'), h('span', {}, `Not using the saved ${label}`)),
+        );
+        resolve(reuse);
+      };
+      tab.cancelPending = () => done(false);
+      use.addEventListener('click', () => done(true));
+      other.addEventListener('click', () => done(false));
+      turn.insertBefore(card, before.isConnected ? before : null);
+      scrollToEnd(tab.log);
     });
   }
 
@@ -1107,10 +1275,19 @@ export class BrowserScreen {
       }),
       row('New chat in this tab', 'chat', () => {
         close();
-        tab.stopRequested = true;
-        tab.cancelPending?.();
+        this.stopTab(tab);
+        // Drop the running turn's result too: the cleared history must not come back.
+        tab.runId += 1;
+        tab.busy = false;
+        tab.waiting = false;
+        tab.liveStatus = '';
         tab.agentState = null;
         tab.log.replaceChildren(this.renderWelcome());
+        if (tab === this.active) {
+          this.syncComposer();
+          this.syncPill();
+        }
+        this.syncTabsButton();
       }),
     );
     if (tab.browser.isOpen) {
@@ -1160,7 +1337,16 @@ export class BrowserScreen {
           const card = h(
             'button',
             { class: `tab-card${tab === this.active ? ' current' : ''}`, type: 'button' },
-            h('div', { class: 'tab-preview' }, preview, tab.busy ? h('span', { class: 'tab-busy' }, h('span', { class: 'spinner' }), 'Working') : null),
+            h(
+              'div',
+              { class: 'tab-preview' },
+              preview,
+              tab.waiting
+                ? h('span', { class: 'tab-busy waiting' }, icon('hand'), 'Needs you')
+                : tab.busy
+                  ? h('span', { class: 'tab-busy' }, h('span', { class: 'spinner' }), 'Working')
+                  : null,
+            ),
             h('div', { class: 'tab-meta' }, h('strong', {}, title), h('span', {}, tab.lastText || 'No chat yet')),
             closeBtn,
           );

@@ -36,12 +36,16 @@ export function siteOf(url: string | null | undefined): string {
   }
 }
 
-/** True when `host` is the secret's site or one of its subdomains (login.example.com ↔ example.com). */
+/**
+ * True when `host` is the secret's site or one of its subdomains
+ * (a secret for example.com works on login.example.com, never the reverse,
+ * so a sibling subdomain cannot receive it).
+ */
 export function siteMatches(secretDomain: string, host: string): boolean {
   if (!secretDomain || !host) return false;
   const a = secretDomain.toLowerCase();
   const b = host.toLowerCase().replace(/^www\./, '');
-  return a === b || b.endsWith(`.${a}`) || a.endsWith(`.${b}`);
+  return a === b || b.endsWith(`.${a}`);
 }
 
 export function normalizeSecretName(name: string): string {
@@ -78,6 +82,8 @@ export class SecretVault {
   find(name: string, host: string): SecretMeta | null {
     const wanted = normalizeSecretName(name);
     for (const entry of this.entries.values()) {
+      // One-time codes expire: always ask for a new one.
+      if (entry.kind === 'otp') continue;
       if (entry.name === wanted && siteMatches(entry.domain, host)) return stripValue(entry);
     }
     return null;
@@ -94,12 +100,18 @@ export class SecretVault {
     };
     const key = keyFor(entry.name, entry.domain);
     this.entries.set(key, entry);
-    if (entry.remembered) {
-      await secureSet(VALUE_PREFIX + key, entry.value);
-    } else {
-      await secureRemove(VALUE_PREFIX + key);
+    try {
+      if (entry.remembered) {
+        await secureSet(VALUE_PREFIX + key, entry.value);
+      } else {
+        await secureRemove(VALUE_PREFIX + key);
+      }
+      await this.persistIndex();
+    } catch {
+      // Secure storage failed: keep it for this session only.
+      entry.remembered = false;
+      await secureRemove(VALUE_PREFIX + key).catch(() => undefined);
     }
-    await this.persistIndex();
     return stripValue(entry);
   }
 
@@ -111,6 +123,8 @@ export class SecretVault {
   }
 
   async clear(): Promise<void> {
+    // Include remembered secrets that were never loaded this session.
+    await this.load().catch(() => undefined);
     for (const entry of [...this.entries.values()]) await this.remove(entry.name, entry.domain);
   }
 
@@ -124,12 +138,14 @@ export class SecretVault {
    */
   valueForFill(name: string, host: string): string {
     const wanted = normalizeSecretName(name.replace(/^secret:/, ''));
+    let elsewhere = '';
     for (const entry of this.entries.values()) {
       if (entry.name !== wanted) continue;
-      if (!siteMatches(entry.domain, host)) {
-        throw new Error(`Secret "${wanted}" belongs to ${entry.domain} and cannot be used on ${host || 'this page'}.`);
-      }
-      return entry.value;
+      if (siteMatches(entry.domain, host)) return entry.value;
+      elsewhere ||= entry.domain;
+    }
+    if (elsewhere) {
+      throw new Error(`Secret "${wanted}" belongs to ${elsewhere} and cannot be used on ${host || 'this page'}.`);
     }
     throw new Error(`No secret named "${wanted}". Call request_secret first.`);
   }
@@ -139,7 +155,9 @@ export class SecretVault {
     let out = text;
     for (const entry of this.entries.values()) {
       if (entry.value.length < MIN_REDACT_LENGTH) continue;
-      out = out.split(entry.value).join(`[REDACTED secret:${entry.name}]`);
+      // Page text reaches the model as JSON, where quotes and backslashes are escaped.
+      const forms = new Set([entry.value, JSON.stringify(entry.value).slice(1, -1), encodeURIComponent(entry.value)]);
+      for (const form of forms) out = out.split(form).join(`[REDACTED secret:${entry.name}]`);
     }
     return out;
   }

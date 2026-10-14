@@ -189,6 +189,11 @@ export class BrowserTab {
   private visible = true;
   private loadWaiters: Array<() => void> = [];
   private listeners = new Set<TabListener>();
+  /** Bumped by close(), so an open() still in flight knows to discard its webview. */
+  private openSeq = 0;
+  private opening: Promise<void> | null = null;
+  /** The tab was removed: it must never open a page again. */
+  private disposed = false;
 
   get isOpen(): boolean {
     return this.webViewId !== undefined;
@@ -298,12 +303,26 @@ export class BrowserTab {
   }
 
   async open(url: string): Promise<void> {
+    if (this.disposed) throw new Error('This tab was closed.');
     listenersReady ??= registerBrowserListeners();
     await listenersReady;
+    if (this.opening) await this.opening.catch(() => undefined);
+    if (this.disposed) throw new Error('This tab was closed.');
     if (this.webViewId) {
       await this.navigate(url);
       return;
     }
+    const seq = ++this.openSeq;
+    const opening = this.openWebView(url, seq);
+    this.opening = opening;
+    try {
+      await opening;
+    } finally {
+      if (this.opening === opening) this.opening = null;
+    }
+  }
+
+  private async openWebView(url: string, seq: number): Promise<void> {
     this.loading = true;
     this.url = url;
     this.emit();
@@ -332,13 +351,24 @@ export class BrowserTab {
       // Android's blank toolbar only navigates history when native navigation is active.
       ...(Capacitor.getPlatform() === 'android' ? { activeNativeNavigationForWebview: true } : {}),
     });
+    if (seq !== this.openSeq || this.disposed) {
+      // Closed while opening: do not leave an orphan page on screen.
+      await InAppBrowser.close({ id: result.id }).catch(() => undefined);
+      this.loading = false;
+      this.emit();
+      throw new Error('This page was closed.');
+    }
     this.webViewId = result.id;
     tabsByWebView.set(result.id, this);
+    // Visibility or frame may have changed while the page was opening.
+    if (!this.visible) await InAppBrowser.hide({ id: result.id }).catch(() => undefined);
+    if (this.frame) await this.setFrame(this.frame);
     this.emit();
     await loaded;
   }
 
   async navigate(url: string): Promise<void> {
+    if (this.disposed) throw new Error('This tab was closed.');
     if (!this.webViewId) return this.open(url);
     this.loading = true;
     this.url = url;
@@ -349,10 +379,21 @@ export class BrowserTab {
   }
 
   async close(): Promise<void> {
-    if (!this.webViewId) return;
+    this.openSeq += 1;
+    if (!this.webViewId) {
+      this.loading = false;
+      return;
+    }
     const id = this.webViewId;
     await InAppBrowser.close({ id }).catch(() => undefined);
     if (this.webViewId === id) this.handleClosed();
+  }
+
+  /** Close for good (tab removed, sign out): later open/navigate calls fail. */
+  async dispose(): Promise<void> {
+    this.disposed = true;
+    this.listeners.clear();
+    await this.close();
   }
 
   async goBack(): Promise<void> {
@@ -393,8 +434,14 @@ export class BrowserTab {
       code: `
         (() => {
           const active = document.activeElement;
-          if (active && 'value' in active) {
-            active.value = ${escaped};
+          if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
+            // Native setter so React/Vue fields notice the change.
+            const proto = active instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+            Object.getOwnPropertyDescriptor(proto, 'value').set.call(active, ${escaped});
+            active.dispatchEvent(new Event('input', { bubbles: true }));
+            active.dispatchEvent(new Event('change', { bubbles: true }));
+          } else if (active && active.isContentEditable) {
+            active.textContent = ${escaped};
             active.dispatchEvent(new Event('input', { bubbles: true }));
           }
         })();
@@ -422,6 +469,10 @@ export class BrowserTab {
       Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, ${JSON.stringify(value)});
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
+      // Keep the value masked in screenshots and out of page reads, even if
+      // the site shows it as plain text or the user taps "show password".
+      el.setAttribute('data-autobrowse-secret', '');
+      el.style.setProperty('-webkit-text-security', 'disc', 'important');
       return { filled: true, field: (el.type || el.tagName).toLowerCase() };
     })()`;
     return this.runScriptReturning(code);
@@ -439,7 +490,8 @@ export class BrowserTab {
         const r = el.getBoundingClientRect();
         if (r.width < 4 || r.height < 4 || r.bottom < 0 || r.top > vh || r.right < 0 || r.left > vw) continue;
         // Never expose what is typed in password/sensitive fields.
-        const sensitive = el.type === 'password' || /cc-|one-time-code|current-password|new-password/.test(el.autocomplete || '');
+        const sensitive = el.type === 'password' || el.hasAttribute('data-autobrowse-secret') ||
+          /cc-|one-time-code|current-password|new-password/.test(el.autocomplete || '');
         const label = (el.innerText || (sensitive ? '' : el.value) || el.getAttribute('aria-label') ||
           el.getAttribute('placeholder') || el.getAttribute('title') || el.getAttribute('name') || '').trim();
         elements.push({
@@ -458,6 +510,16 @@ export class BrowserTab {
         elements,
       };
     })()`);
+  }
+
+  /** Visible label of the control at a viewport point (to spot buy/send/delete buttons). */
+  async labelAt(x: number, y: number): Promise<string> {
+    return this.runScriptReturning<string>(`(() => {
+      const hit = document.elementFromPoint(${Number(x)}, ${Number(y)});
+      const el = hit && hit.closest ? (hit.closest('button,a,[role=button],input[type=submit],input[type=button]') || hit) : null;
+      if (!el) return '';
+      return (el.innerText || el.value || el.getAttribute('aria-label') || el.getAttribute('title') || '').trim().replace(/\\s+/g, ' ').slice(0, 80);
+    })()`, 3_000);
   }
 
   /** CSS viewport size, used to map screenshot pixels to click coordinates. */
@@ -526,27 +588,23 @@ export class BrowserTab {
     const id = this.requireId();
     const channel = `capgo-dom-${crypto.randomUUID()}`;
 
+    let settle: { resolve: (value: T) => void; reject: (error: Error) => void } | undefined;
     const listenerPromise = new Promise<T>((resolve, reject) => {
-      let handle: PluginListenerHandle | undefined;
-      const timeout = setTimeout(() => {
-        void handle?.remove();
-        reject(new Error('Timed out waiting for webview message'));
-      }, timeoutMs);
-
-      void InAppBrowser.addListener('messageFromWebview', (event) => {
-        const detail = event.detail as { channel?: string; payload?: T; error?: string };
-        if (detail?.channel !== channel) return;
-        clearTimeout(timeout);
-        void handle?.remove();
-        if (detail.error) {
-          reject(new Error(detail.error));
-          return;
-        }
-        resolve(detail.payload as T);
-      }).then((h) => {
-        handle = h;
-      });
+      settle = { resolve, reject };
     });
+    // Register before running the script, or a fast page reply is lost.
+    const handle: PluginListenerHandle = await InAppBrowser.addListener('messageFromWebview', (event) => {
+      const detail = event.detail as { channel?: string; payload?: T; error?: string };
+      if (detail?.channel !== channel) return;
+      clearTimeout(timeout);
+      void handle.remove();
+      if (detail.error) settle?.reject(new Error(detail.error));
+      else settle?.resolve(detail.payload as T);
+    });
+    const timeout = setTimeout(() => {
+      void handle.remove();
+      settle?.reject(new Error('Timed out waiting for webview message'));
+    }, timeoutMs);
 
     const wrapped = `
       (() => {
@@ -559,7 +617,13 @@ export class BrowserTab {
       })();
     `;
 
-    await InAppBrowser.executeScript({ id, code: wrapped });
+    try {
+      await InAppBrowser.executeScript({ id, code: wrapped });
+    } catch (error) {
+      clearTimeout(timeout);
+      void handle.remove();
+      throw error;
+    }
     return listenerPromise;
   }
 }

@@ -304,6 +304,9 @@ export async function refreshAccessToken(
   }
 
   const token = JSON.parse(res.text) as TokenResponse;
+  // A refresh may omit the rotated refresh token or the scope: keep the old ones.
+  token.refresh_token ||= record.refreshToken;
+  token.scope ||= record.scopes.join(' ');
   const updated = await credentialFromTokenResponse(token, {
     clientId: record.clientId,
     extAgentHostId: record.extAgentHostId,
@@ -311,8 +314,7 @@ export async function refreshAccessToken(
   });
   updated.email = record.email;
   updated.subject = record.subject;
-  await saveCredentials(updated);
-  await setActiveClientId(updated.clientId);
+  // Saved by the session (auth/session.ts), which drops it after a sign out.
   return updated;
 }
 

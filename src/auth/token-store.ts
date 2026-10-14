@@ -15,7 +15,13 @@ export async function loadCredentials(clientId: string): Promise<OAuthCredential
   if (!raw) {
     return null;
   }
-  return JSON.parse(raw) as OAuthCredentialRecord;
+  try {
+    return JSON.parse(raw) as OAuthCredentialRecord;
+  } catch {
+    // Damaged entry: treat as signed out instead of failing the launch.
+    await secureRemove(storageKeyForClient(clientId)).catch(() => undefined);
+    return null;
+  }
 }
 
 export async function loadLatestCredentials(): Promise<OAuthCredentialRecord | null> {

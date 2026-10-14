@@ -101,7 +101,7 @@ const home: Page = {
   ${feature('Secrets stay secret', 'Passwords and codes go into a secure card, stay in the Keychain, and are filled into the right site by the app. The AI never sees them.')}
   ${feature('It asks, you decide', 'The agent asks with simple answer cards and stops before buying, posting or changing an account. Links that try to open other apps need your OK.')}
   ${feature('Export the results', 'Ask for a table and get a CSV, JSON or Markdown file you can save or share.')}
-  ${feature('Voice', 'Tap the mic and speak. Dictation runs on your device.')}
+  ${feature('Voice', 'Tap the mic and speak. Dictation stays on your phone when your language supports it.')}
 </section>
 
 <section class="band">
@@ -157,7 +157,7 @@ const privacy: Page = {
 </ul>
 
 <h2>Voice input</h2>
-<p>Dictation uses the speech recognition built into your phone (Apple Speech on iOS, Android speech services). Depending on your device settings, Apple or Google may process the audio under their own privacy policies. We never receive the audio.</p>
+<p>Dictation uses the speech recognition built into your phone (Apple Speech on iOS, Android speech services). When your phone supports your language offline, the audio never leaves the device. Otherwise Apple or Google process the audio under their own privacy policies. Dictated text is only placed in the message box; nothing is sent until you tap Send. We never receive the audio.</p>
 
 <h2>Reporting an AI answer</h2>
 <p>If you tap "Report" on an answer and send the report, the app sends us the reported answer, the message that led to it, your reason, an optional comment, and the platform and app version, so we can review problems with AI output. This is sent only when you choose to send a report. It is delivered by email to our team and is not used for anything else.</p>
@@ -175,7 +175,7 @@ const privacy: Page = {
 <ul>
 <li>Use the browser without signing in. Nothing is sent to OpenAI.</li>
 <li>Withdraw consent in Settings &gt; AI data sharing.</li>
-<li>Sign out in Settings. This deletes all stored tokens.</li>
+<li>Sign out in Settings. This deletes all stored tokens, website logins, saved passwords and your OpenAI data sharing choice.</li>
 <li>Delete the app to remove all local data.</li>
 <li>Revoke the app's access in your ChatGPT account settings.</li>
 </ul>
@@ -216,7 +216,7 @@ const support: Page = {
 <h3>Does it cost anything?</h3><p>No. The app is free and the agent uses your own ChatGPT plan limits.</p>
 <h3>I hit a usage limit.</h3><p>Your ChatGPT plan has usage limits. Wait for them to reset or change your plan with OpenAI.</p>
 <h3>What is sent to OpenAI?</h3><p>Only after you allow it: your messages, the pages the agent reads and your answers to its questions. Passwords from secure cards never are. Turn it off in Settings &gt; AI data sharing. Details in the <a href="/privacy/">privacy policy</a>.</p>
-<h3>How do I delete my data?</h3><p>Settings &gt; Sign out removes your tokens. "Close all tabs and clear browsing data" removes cookies and cache. Deleting the app removes everything.</p>
+<h3>How do I delete my data?</h3><p>Settings &gt; Sign out removes your tokens, website logins and saved passwords. "Close all tabs and clear browsing data" removes cookies, cache and website storage. Deleting the app removes everything.</p>
 <h3>An answer was wrong or harmful.</h3><p>Tap "Report" under the answer. We review every report.</p>
 </article>`,
 };

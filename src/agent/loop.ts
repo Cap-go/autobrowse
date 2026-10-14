@@ -1,6 +1,6 @@
 import type { OAuthCredentialRecord } from '../auth/types';
 import { type BrowserTab, defaultTab } from '../browser/browser-controller';
-import { refreshAccessToken } from '../auth/oauth';
+import { currentCredentials, refreshCredentials } from '../auth/session';
 import { runBrowserTool, type UserToolHandlers } from './browser-tools-runner';
 import { vault } from '../secrets/vault';
 import { isAppActive, whenActive } from './lifecycle';
@@ -15,8 +15,12 @@ export interface AgentLoopState {
 
 export interface AgentLoopHooks {
   onAssistantDelta?: (delta: string) => void;
-  /** Polled before each model step; return true to stop early. */
+  /** Polled before each model step and each tool; return true to stop early. */
   shouldStop?: () => boolean;
+  /** Aborting drops the model request in flight and skips the remaining tools. */
+  signal?: AbortSignal;
+  /** Called whenever the history is consistent, so work survives a later failure. */
+  onCheckpoint?: (state: AgentLoopState) => void;
   onToolStart?: (name: string, args: Record<string, unknown>) => void;
   onToolEnd?: (name: string, ok: boolean, summary: string) => void;
   onStepStart?: (step: number) => void;
@@ -36,9 +40,10 @@ async function withFreshToken<T>(
   creds: OAuthCredentialRecord,
   fn: (token: string) => Promise<T>,
 ): Promise<{ value: T; credentials: OAuthCredentialRecord }> {
-  let record = creds;
+  // Another tab may have refreshed (and rotated) the token already.
+  let record = currentCredentials() ?? creds;
   if (Date.now() >= record.expiresAtMs - 60_000) {
-    record = await refreshAccessToken(record);
+    record = await refreshCredentials(record);
   }
 
   try {
@@ -46,11 +51,38 @@ async function withFreshToken<T>(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes('401') || message.includes('invalid_token')) {
-      record = await refreshAccessToken(record);
+      record = await refreshCredentials(record);
       return { value: await fn(record.accessToken), credentials: record };
     }
     throw error;
   }
+}
+
+export class StoppedError extends Error {
+  constructor() {
+    super('Stopped.');
+    this.name = 'StoppedError';
+  }
+}
+
+/** Resolve with `promise`, or reject as soon as `signal` aborts (the request itself may keep running). */
+function untilAborted<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(new StoppedError());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => reject(new StoppedError());
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+    );
+  });
 }
 
 /** Secrets must never reach the model, even if a page echoes them back. */
@@ -123,11 +155,14 @@ export async function runAgentTurn(
   const toolResults: ToolCallResult[] = [];
   let assistantText = '';
   let credentials = creds;
+  const stopped = (): boolean => !!hooks?.signal?.aborted || !!hooks?.shouldStop?.();
+  const checkpoint = (): void =>
+    hooks?.onCheckpoint?.({ messages: compactHistory(messages.filter((m) => !('role' in m && m.role === 'developer'))) });
 
   let budgetSpent = false;
   for (let step = 1; step <= MAX_TOOL_STEPS + 1; step++) {
     await whenActive();
-    if (hooks?.shouldStop?.()) break;
+    if (stopped()) break;
     // After the tool budget, ask once more with tools disabled so the user
     // always gets an answer built from what was found.
     const finalAnswer = step > MAX_TOOL_STEPS;
@@ -139,7 +174,7 @@ export async function runAgentTurn(
       });
     }
     hooks?.onStepStart?.(step);
-    const response = await withFreshToken(credentials, async (accessToken) => {
+    const response = await untilAborted(withFreshToken(credentials, async (accessToken) => {
       const stream = await withNetworkRetry(() =>
         createResponseStream({ accessToken, messages: compactHistory(messages), noTools: finalAnswer }),
       );
@@ -153,14 +188,17 @@ export async function runAgentTurn(
       }
       if (!parsed) throw new Error('Responses API stream ended before completion');
       return parsed;
-    });
+    }), hooks?.signal);
     credentials = response.credentials;
     const turn = response.value;
     assistantText += turn.assistantText;
     if (turn.assistantText) {
       messages.push({ role: 'assistant', content: turn.assistantText });
     }
-    if (!turn.toolCalls.length || finalAnswer) break;
+    if (!turn.toolCalls.length || finalAnswer) {
+      checkpoint();
+      break;
+    }
 
     // Preserve every call before adding outputs, including parallel tool calls.
     for (const call of turn.toolCalls) {
@@ -175,6 +213,13 @@ export async function runAgentTurn(
     for (const call of turn.toolCalls) {
       // Browser actions need the app in the foreground.
       await whenActive();
+      if (stopped()) {
+        // Every call needs an output, or the next request is rejected.
+        const output = JSON.stringify({ ok: false, error: 'Stopped by the user before this action ran.' });
+        messages.push({ type: 'function_call_output', call_id: call.callId, output });
+        toolResults.push({ toolCallId: call.callId, output });
+        continue;
+      }
       hooks?.onToolStart?.(call.name, call.arguments);
       let output: ToolOutput;
       let ok = true;
@@ -190,13 +235,14 @@ export async function runAgentTurn(
         summary = typeof output === 'string' ? output.slice(0, 200) : 'Screenshot captured.';
       } catch (error) {
         ok = false;
-        summary = error instanceof Error ? error.message : String(error);
+        summary = vault.redact(error instanceof Error ? error.message : String(error));
         output = JSON.stringify({ ok: false, error: summary });
       }
       messages.push({ type: 'function_call_output', call_id: call.callId, output });
       toolResults.push({ toolCallId: call.callId, output });
       hooks?.onToolEnd?.(call.name, ok, summary);
     }
+    checkpoint();
   }
   // Keep the internal budget note out of the follow-up history.
   if (budgetSpent) {
@@ -204,7 +250,8 @@ export async function runAgentTurn(
     if (index >= 0) messages.splice(index, 1);
   }
 
-  return { assistantText, toolResults, state: { messages } };
+  // Keep only what the next request needs: old screenshots are large.
+  return { assistantText, toolResults, state: { messages: compactHistory(messages) } };
 }
 
 export function appendUserMessage(state: AgentLoopState, text: string): AgentLoopState {

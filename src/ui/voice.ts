@@ -75,11 +75,18 @@ export class VoiceInput {
     this.maxTimer = setTimeout(() => void this.stop(), MAX_MS);
 
     try {
+      const language = navigator.language || 'en-US';
+      // Keep audio on the phone when the recognizer supports this language
+      // offline; otherwise the platform service is used (see Privacy Policy).
+      const onDevice = await SpeechRecognition.isOnDeviceRecognitionAvailable?.({ language, preferLegacyRecognizer: true })
+        .then((r) => r.available)
+        .catch(() => false);
       const result = await SpeechRecognition.start({
-        language: navigator.language || 'en-US',
+        language,
         partialResults: true,
         popup: false,
         addPunctuation: true,
+        ...(onDevice ? { useOnDeviceRecognition: true, preferLegacyRecognizer: true } : {}),
       });
       // Android resolves start() without a payload when partialResults is on.
       const final = result?.matches?.[0];

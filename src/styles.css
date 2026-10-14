@@ -689,6 +689,8 @@ h3 {
 .backdrop {
   position: fixed;
   inset: 0;
+  /* Keep sheet fields and buttons above the iOS keyboard. */
+  padding-bottom: var(--kb, 0px);
   background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: flex-end;
@@ -2677,4 +2679,21 @@ body {
   font-size: 15px;
   resize: none;
   color: var(--text);
+}
+
+.tab-busy.waiting {
+  background: #b45309;
+}
+
+.tab-busy .icon {
+  width: 12px;
+  height: 12px;
+}
+
+.recovery {
+  margin-top: 8px;
+}
+
+button.primary.danger {
+  background: var(--danger);
 }

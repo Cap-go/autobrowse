@@ -1,6 +1,7 @@
 import { InAppBrowser } from '@capgo/capacitor-inappbrowser';
 import { completeSignIn } from '../auth/oauth';
-import { loadLatestCredentials, signOut } from '../auth/token-store';
+import { loadLatestCredentials } from '../auth/token-store';
+import { currentCredentials, endSession, setCredentials } from '../auth/session';
 import type { OAuthCredentialRecord } from '../auth/types';
 import { APP_LINKS, PREF_KEYS } from '../config';
 import { parseDeepLink } from '../deeplink';
@@ -42,7 +43,6 @@ const ONBOARDING = [
 export class App {
   private root: HTMLElement;
   private screen: Screen = 'onboarding';
-  private creds: OAuthCredentialRecord | null = null;
   private sheets: Array<() => void> = [];
   private screenView = new BrowserScreen({
     creds: () => this.creds,
@@ -56,14 +56,19 @@ export class App {
     this.root = root;
   }
 
+  /** The signed-in account, always the latest refreshed record (see auth/session). */
+  private get creds(): OAuthCredentialRecord | null {
+    return currentCredentials();
+  }
+
   async init(preset?: { creds: OAuthCredentialRecord | null; screen: Screen }): Promise<void> {
     if (preset) {
-      this.creds = preset.creds;
+      setCredentials(preset.creds);
       this.screen = preset.screen;
       this.render();
       return;
     }
-    this.creds = await loadLatestCredentials();
+    setCredentials(await loadLatestCredentials().catch(() => null));
     if (this.creds) {
       this.screen = 'main';
     } else {
@@ -142,7 +147,8 @@ export class App {
 
     const finish = (): void => {
       markOnboarded();
-      this.go('connect');
+      // Replaying the introduction while signed in goes back to the browser.
+      this.go(this.creds ? 'main' : 'connect');
     };
 
     next.addEventListener('click', () => {
@@ -219,9 +225,9 @@ export class App {
       status.className = 'status';
       status.textContent = 'Opening ChatGPT sign in…';
       try {
-        this.creds = await completeSignIn();
+        setCredentials(await completeSignIn());
         this.go('main');
-        this.askAiConsent();
+        this.afterSignIn();
       } catch (error) {
         status.className = 'status error';
         status.textContent = friendlyError(error);
@@ -338,10 +344,10 @@ export class App {
       status.className = 'status';
       status.textContent = 'Opening ChatGPT sign in…';
       try {
-        this.creds = await completeSignIn();
+        setCredentials(await completeSignIn());
         close();
         this.go('main');
-        this.askAiConsent();
+        this.afterSignIn();
       } catch (error) {
         status.className = 'status error';
         status.textContent = friendlyError(error);
@@ -350,10 +356,46 @@ export class App {
     });
   }
 
-  /** Right after sign in, before the first task, ask to share data with OpenAI. */
-  private askAiConsent(): void {
-    if (hasAiConsent()) return;
+  /**
+   * Right after sign in: send the task the user already chose (it asks for
+   * consent itself), or ask to share data with OpenAI before the first task.
+   */
+  private afterSignIn(): void {
+    if (this.screenView.resumeAfterSignIn() || hasAiConsent()) return;
     void requestAiConsent((title, content, onClose) => this.openSheet(title, content, onClose));
+  }
+
+  /** Sign out removes everything tied to this person, so the next user starts clean. */
+  private confirmSignOut(): void {
+    const confirm = h('button', { class: 'primary block danger', type: 'button' }, 'Sign out');
+    const cancel = h('button', { class: 'secondary block', type: 'button' }, 'Cancel');
+    const close = this.openSheet(
+      'Sign out?',
+      h(
+        'div',
+        { class: 'sheet-body' },
+        h(
+          'p',
+          { class: 'lede' },
+          'This closes all tabs and removes your ChatGPT sign in, website logins, saved passwords and your data sharing choice from this device.',
+        ),
+        confirm,
+        cancel,
+      ),
+    );
+    cancel.addEventListener('click', close);
+    confirm.addEventListener('click', async () => {
+      confirm.disabled = true;
+      this.screenView.stopAll();
+      await this.screenView.reset();
+      await endSession();
+      await vault.clear().catch(() => undefined);
+      await clearBrowsingData();
+      setAiConsent(false);
+      close();
+      this.go('connect');
+      toast('Signed out. Website logins and saved passwords were removed.');
+    });
   }
 
   async openSettings(): Promise<void> {
@@ -395,7 +437,13 @@ export class App {
       const r = row(`Share data with OpenAI: ${allowed ? 'On' : 'Off'}`, 'chevron', async () => {
         if (hasAiConsent()) {
           setAiConsent(false);
-          toast('Data sharing with OpenAI is off. The agent will ask again before the next task.');
+          // Running agents stop now: nothing more is sent.
+          const stopped = this.screenView.stopAll();
+          toast(
+            stopped
+              ? `Data sharing with OpenAI is off. Stopped ${stopped} running ${stopped === 1 ? 'task' : 'tasks'}.`
+              : 'Data sharing with OpenAI is off. The agent will ask again before the next task.',
+          );
         } else {
           await requestAiConsent((title, content, onClose) => this.openSheet(title, content, onClose));
         }
@@ -429,21 +477,18 @@ export class App {
         'Data',
         row('Close all tabs and clear browsing data', 'trash', async () => {
           await this.screenView.reset();
-          await InAppBrowser.clearAllCookies().catch(() => undefined);
-          await InAppBrowser.clearCache().catch(() => undefined);
+          await clearBrowsingData();
           close();
           this.render();
+          toast('Tabs closed and browsing data cleared.');
         }),
       ),
     );
 
     if (this.creds) {
-      const out = row('Sign out', 'logout', async () => {
-        await this.screenView.reset();
-        await signOut();
-        this.creds = null;
+      const out = row('Sign out', 'logout', () => {
         close();
-        this.go('connect');
+        this.confirmSignOut();
       });
       out.classList.add('danger');
       rows.append(group('Account', out));
@@ -488,6 +533,13 @@ export class App {
 }
 
 // ---------- helpers ----------
+
+/** Cookies, cache and site storage (localStorage, IndexedDB) of every page. */
+async function clearBrowsingData(): Promise<void> {
+  await InAppBrowser.clearAllBrowsingData().catch(() => undefined);
+  await InAppBrowser.clearAllCookies().catch(() => undefined);
+  await InAppBrowser.clearCache().catch(() => undefined);
+}
 
 function hasOnboarded(): boolean {
   try {

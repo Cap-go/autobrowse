@@ -11,6 +11,23 @@ export interface UserToolHandlers {
 
 const MAX_EXPORT_BYTES = 2_000_000;
 
+/**
+ * Buttons whose tap spends money, publishes, sends or deletes. The app asks
+ * the user before tapping them, whatever the model decided.
+ */
+const CONSEQUENTIAL = new RegExp(
+  [
+    'buy', 'pay', 'purchase', 'place (?:your )?order', 'complete (?:order|purchase|payment)', 'check ?out',
+    'confirm (?:order|purchase|payment|booking|transfer)', 'submit (?:order|payment)', 'send', 'post', 'publish',
+    'tweet', 'delete', 'subscribe', 'book now', 'reserve', 'transfer', 'donate', 'sign up', 'create account',
+  ].map((word) => `\\b${word}\\b`).join('|'),
+  'i',
+);
+
+export function isConsequentialLabel(label: string): boolean {
+  return CONSEQUENTIAL.test(label);
+}
+
 export async function runBrowserTool(
   name: BrowserToolName,
   args: Record<string, unknown>,
@@ -102,7 +119,22 @@ export async function runBrowserTool(
       ];
     }
     case 'browser_click': {
-      await browser.clickAt(Number(args.x), Number(args.y));
+      const x = Number(args.x);
+      const y = Number(args.y);
+      const label = await browser.labelAt(x, y).catch(() => '');
+      if (label && isConsequentialLabel(label)) {
+        if (!handlers.askUser) throw new Error('This action needs the user to confirm it.');
+        const site = siteOf(browser.url) || 'this page';
+        const { answer } = await handlers.askUser({
+          question: `Allow the agent to tap “${label}” on ${site}?`,
+          options: ['Allow', 'Don’t allow'],
+          allowFreeText: false,
+        });
+        if (answer !== 'Allow') {
+          return JSON.stringify({ ok: false, declined: true, note: `The user did not allow tapping "${label}". Do not try again; ask what to do instead.` });
+        }
+      }
+      await browser.clickAt(x, y);
       return JSON.stringify({ ok: true });
     }
     case 'browser_type': {
