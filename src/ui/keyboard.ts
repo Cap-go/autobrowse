@@ -25,4 +25,18 @@ export function trackKeyboard(): void {
     if (Capacitor.getPlatform() === 'android' && document.activeElement instanceof HTMLElement) document.activeElement.blur();
   });
   void Keyboard.setAccessoryBarVisible({ isVisible: false }).catch(() => undefined);
+
+  if (Capacitor.getPlatform() === 'android') {
+    // Once a native page was shown, Android does not open the keyboard for
+    // fields in sheets (report, etc.) on its own. The browser screen handles
+    // its own fields; ask for the keyboard everywhere else.
+    document.addEventListener('focusin', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
+      if (target.type === 'checkbox' || target.type === 'radio' || target.closest('.screen.browser')) return;
+      requestAnimationFrame(() => {
+        if (document.activeElement === target) void Keyboard.show().catch(() => undefined);
+      });
+    });
+  }
 }
