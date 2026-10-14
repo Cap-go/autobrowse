@@ -459,7 +459,7 @@ export class App {
       );
     }
 
-    // About footer: app icon, versions, maker, and the "Made with Capgo" pill.
+    // About footer: app icon, versions, maker, and the "By Capgo" pill.
     const maker = h('a', { href: APP_LINKS.makerX, class: 'about-link' }, 'Martin Donadieu');
     maker.addEventListener('click', (e) => {
       e.preventDefault();
@@ -467,9 +467,9 @@ export class App {
     });
     const capgo = h(
       'button',
-      { class: 'capgo-pill', type: 'button', 'aria-label': 'Made with Capgo, open capgo.app' },
+      { class: 'capgo-pill', type: 'button', 'aria-label': 'By Capgo, open capgo.app' },
       icon('capgo', 'capgo-logo'),
-      h('span', {}, 'Made with Capgo'),
+      h('span', {}, 'By Capgo'),
     );
     capgo.addEventListener('click', () => void openExternal(APP_LINKS.capgo));
     rows.append(
@@ -479,7 +479,7 @@ export class App {
         h('img', { class: 'about-icon', src: '/app-icon.png', alt: 'Auto Browse' }),
         h('p', { class: 'about-version' }, await versionLine()),
         h('p', { class: 'about-maker' }, 'Made by ', maker),
-        h('p', { class: 'about-note' }, 'Built with Capacitor and shipped with Capgo live updates. Not affiliated with OpenAI.'),
+        h('p', { class: 'about-note' }, 'Not affiliated with OpenAI.'),
         capgo,
       ),
     );

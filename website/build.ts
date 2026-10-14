@@ -61,7 +61,7 @@ ${nav}
 <main>${page.body}</main>
 <footer class="foot">
   <p><a href="/privacy/">Privacy</a> · <a href="/terms/">Terms</a> · <a href="/support/">Support</a> · <a href="/deeplinks/">Deep links</a></p>
-  <p>© 2026 Digital shift OU · Made with <a href="https://capgo.app/?utm_source=autobrowse.dev">Capgo</a> by <a href="https://x.com/martindonadieu">Martin Donadieu</a> · Not affiliated with OpenAI.</p>
+  <p>© 2026 Digital shift OU · By <a href="https://capgo.app/?utm_source=autobrowse.dev">Capgo</a> and <a href="https://x.com/martindonadieu">Martin Donadieu</a> · Not affiliated with OpenAI.</p>
 </footer>
 </body>
 </html>
