@@ -1,21 +1,29 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# R8 shrinks and optimizes libraries (androidx, okhttp, kotlin) but keeps
+# the Capacitor bridge and plugin code intact, since the bridge, the updater
+# and the in-app browser call into them by name and through reflection.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod,SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Capacitor bridge and app code
+-keep class com.getcapacitor.** { *; }
+-keep class app.capgo.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Plugins
+-keep class com.capacitorjs.plugins.** { *; }
+-keep class ee.forgr.** { *; }
+-keep class com.whitestein.securestorage.** { *; }
+
+# Updater looks these up with reflection
+-keep class androidx.webkit.WebViewFeature { *; }
+-keep class androidx.webkit.WebViewCompat { *; }
+-keep class * extends androidx.work.ListenableWorker { <init>(...); }
+
+# WebView JS bridges
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**
