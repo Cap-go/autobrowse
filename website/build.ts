@@ -11,7 +11,7 @@ const OUT = join(ROOT, 'dist');
 const REPO = join(ROOT, '..');
 
 const SITE = 'https://autobrowse.dev';
-const GITHUB = 'https://github.com/Cap-go/capgo-browser';
+const GITHUB = 'https://github.com/Cap-go/autobrowse';
 const APP_STORE = 'https://apps.apple.com/app/id6821215230';
 const PLAY = 'https://play.google.com/store/apps/details?id=app.capgo.browser';
 const EMAIL = 'tori@capgo.app';
