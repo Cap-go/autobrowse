@@ -11,6 +11,7 @@ const OUT = join(ROOT, 'dist');
 const REPO = join(ROOT, '..');
 
 const SITE = 'https://autobrowse.dev';
+const GITHUB = 'https://github.com/Cap-go/capgo-browser';
 const APP_STORE = 'https://apps.apple.com/app/id6821215230';
 const PLAY = 'https://play.google.com/store/apps/details?id=app.capgo.browser';
 const EMAIL = 'tori@capgo.app';
@@ -60,7 +61,7 @@ function layout(page: Page): string {
 ${nav}
 <main>${page.body}</main>
 <footer class="foot">
-  <p><a href="/privacy/">Privacy</a> · <a href="/terms/">Terms</a> · <a href="/support/">Support</a> · <a href="/deeplinks/">Deep links</a></p>
+  <p><a href="/privacy/">Privacy</a> · <a href="/terms/">Terms</a> · <a href="/support/">Support</a> · <a href="/deeplinks/">Deep links</a> · <a href="${GITHUB}">Open source on GitHub</a></p>
   <p>© 2026 Digital shift OU · By <a href="https://capgo.app/?utm_source=autobrowse.dev">Capgo</a> and <a href="https://x.com/martindonadieu">Martin Donadieu</a> · Not affiliated with OpenAI.</p>
 </footer>
 </body>
@@ -77,7 +78,7 @@ const home: Page = {
   path: '/',
   title: 'Auto Browse: the AI agent that browses for you',
   description:
-    'Auto Browse is an iPhone and Android browser with an AI agent. Ask in plain words, watch it open pages, click, type and get things done, using your own ChatGPT account.',
+    'Auto Browse is a free, open-source iPhone and Android browser with an AI agent. Ask in plain words, watch it open pages, click, type and get things done, using your own ChatGPT account.',
   body: `
 <section class="hero">
   <img class="hero-icon" src="/icon.png" alt="Auto Browse app icon" width="96" height="96">
@@ -85,7 +86,8 @@ const home: Page = {
   <h1>Ask it.<br>It browses for you.</h1>
   <p class="lede">A real mobile browser with an AI agent inside. Say what you need, then watch it open pages, click, scroll and type, step by step. Take over whenever you want.</p>
   ${storeButtons}
-  <p class="fine">Free. Uses your own ChatGPT account. No ads, no tracking.</p>
+  <p class="fine">Free and open source. Uses your own ChatGPT account. No ads, no tracking.</p>
+  <p><a href="${GITHUB}">View the source on GitHub</a></p>
 </section>
 
 <section class="shots" aria-label="Screenshots">
