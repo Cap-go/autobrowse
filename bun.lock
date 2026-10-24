@@ -6,17 +6,16 @@
       "name": "capgo-browser",
       "dependencies": {
         "@capacitor/android": "^8.5.3",
-        "@capacitor/app": "^8.0.0",
-        "@capacitor/app-launcher": "^8",
+        "@capacitor/app": "^8.1.2",
+        "@capacitor/app-launcher": "^8.0.1",
         "@capacitor/core": "^8.5.3",
-        "@capacitor/filesystem": "^8",
+        "@capacitor/filesystem": "^8.1.5",
         "@capacitor/ios": "^8.5.3",
-        "@capacitor/keyboard": "^8",
-        "@capacitor/share": "^8",
-        "@capgo/capacitor-inappbrowser": "^8.22.2",
-        "@capgo/capacitor-speech-recognition": "^8.4.1",
-        "@capgo/capacitor-updater": "^8.52.1",
-        "@capgo/native-navigation": "^8.0.8",
+        "@capacitor/keyboard": "^8.0.6",
+        "@capacitor/share": "^8.0.3",
+        "@capgo/capacitor-inappbrowser": "^8.26.1",
+        "@capgo/capacitor-speech-recognition": "^8.4.4",
+        "@capgo/capacitor-updater": "^8.53.1",
         "@capgo/oauth-loopback": "file:./plugins/oauth-loopback",
         "capacitor-secure-storage-plugin": "^0.13.0",
       },
@@ -43,7 +42,7 @@
 
     "@capacitor/core": ["@capacitor/core@8.5.3", "", { "dependencies": { "tslib": "^2.1.0" } }, "sha512-oBE1oGuYE4ZzYYrulC75OuHdSsD6zLUy7d5o1tFwDLG4govGoubY15cxpiI5l0+q87Lm5p0bhbehMdzJg4aFag=="],
 
-    "@capacitor/filesystem": ["@capacitor/filesystem@8.1.4", "", { "dependencies": { "@capacitor/synapse": "^1.0.4" }, "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-8MXmt10cb+dGWoh8jUeO8on0U6iETQCX5k+fmdB278PZ3MYDEVGQo08+hroaOtUbK3+5stiRk4/K6QBHKepv0A=="],
+    "@capacitor/filesystem": ["@capacitor/filesystem@8.1.5", "", { "dependencies": { "@capacitor/synapse": "^1.0.4" }, "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-m1RkI8L83NJeppEKyRWioK3MDp2vjlA+QfUQcF8/xRlcXNC2HYxqoyYJ+K4M0EcVovy+g+4F24S05+bhK4Vgdg=="],
 
     "@capacitor/ios": ["@capacitor/ios@8.5.3", "", { "peerDependencies": { "@capacitor/core": "^8.5.0" } }, "sha512-HnnV92Jl8+3x0JUloXUMjFcUsQI8wHFVsKwkLn72DfRZXYGZW11tQbmNOWOnRTljaU18FdI1b9ipT09SzzPDNw=="],
 
@@ -53,13 +52,11 @@
 
     "@capacitor/synapse": ["@capacitor/synapse@1.0.4", "", {}, "sha512-/C1FUo8/OkKuAT4nCIu/34ny9siNHr9qtFezu4kxm6GY1wNFxrCFWjfYx5C1tUhVGz3fxBABegupkpjXvjCHrw=="],
 
-    "@capgo/capacitor-inappbrowser": ["@capgo/capacitor-inappbrowser@8.22.2", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-vHkbjkAHYq/WwK2Lmx08MsgmW1Fv++CWf/SVMU4K3v9JjE9v7Re9ajoIc+8NkBNhWBjcM414Zp22Vmmw/A5ShQ=="],
+    "@capgo/capacitor-inappbrowser": ["@capgo/capacitor-inappbrowser@8.26.1", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-KRaDYoiffSE/28wosqXZ5xee7GVuIV+HcRrTcLriJI/a6Yq/L+OT8R3cnH9O6j+7PjlJUT40n6XKh+lhnyJhhg=="],
 
-    "@capgo/capacitor-speech-recognition": ["@capgo/capacitor-speech-recognition@8.4.1", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-frSzkdpRs/GNc5YIfZv2VWyRqUG+acJtX29ETkis9XzXmgEZEUHLgype/0y4GFmmdOPxEj2ED8GsdLdONCVn4A=="],
+    "@capgo/capacitor-speech-recognition": ["@capgo/capacitor-speech-recognition@8.4.4", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-2E9FqX+9umwHjPm7PI/9tQMX1//suZVED1HN6x0jxThkDCR4+KFl0Gk019KihyGvygAQmdrYnlcvNSQp45Pc3Q=="],
 
-    "@capgo/capacitor-updater": ["@capgo/capacitor-updater@8.52.1", "", { "peerDependencies": { "@capacitor/core": "^8.0.0" } }, "sha512-bvI6kUms5QJXtWznv7JoTdmKlmjobPYIW1santxgn5AZAciXpiDXXcwdaK2sjgK1NyuzREwZw68vzUCWGhrbAA=="],
-
-    "@capgo/native-navigation": ["@capgo/native-navigation@8.0.8", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-h6reEEyhyRJJ2vADmJqxRue1xFQZxvkSieKHixw5MQFxcyEt01DEmkkXSMgJVlZErx7+/cA3bmeTr/kOxPh0uQ=="],
+    "@capgo/capacitor-updater": ["@capgo/capacitor-updater@8.53.1", "", { "peerDependencies": { "@capacitor/core": "^8.0.0" } }, "sha512-aUSFWd75p+b1qo0qHEQVawffifgrgIjvdKEazCIHZVwwK3MNxWUYDU9wkdP51j1VX0cCMMpPiA+j9IX96jZT6g=="],
 
     "@capgo/oauth-loopback": ["@capgo/oauth-loopback@file:plugins/oauth-loopback", { "devDependencies": { "@capacitor/core": "^8.5.3", "typescript": "^5.9.3" }, "peerDependencies": { "@capacitor/core": "^8.0.0" } }],
 

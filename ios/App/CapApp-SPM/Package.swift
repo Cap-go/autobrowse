@@ -20,7 +20,6 @@ let package = Package(
         .package(name: "CapgoCapacitorInappbrowser", path: "../../../node_modules/@capgo/capacitor-inappbrowser"),
         .package(name: "CapgoCapacitorSpeechRecognition", path: "../../../node_modules/@capgo/capacitor-speech-recognition"),
         .package(name: "CapgoCapacitorUpdater", path: "../../../node_modules/@capgo/capacitor-updater"),
-        .package(name: "CapgoNativeNavigation", path: "../../../node_modules/@capgo/native-navigation"),
         .package(name: "CapgoOauthLoopback", path: "../../../node_modules/@capgo/oauth-loopback"),
         .package(name: "CapacitorSecureStoragePlugin", path: "../../../node_modules/capacitor-secure-storage-plugin")
     ],
@@ -38,7 +37,6 @@ let package = Package(
                 .product(name: "CapgoCapacitorInappbrowser", package: "CapgoCapacitorInappbrowser"),
                 .product(name: "CapgoCapacitorSpeechRecognition", package: "CapgoCapacitorSpeechRecognition"),
                 .product(name: "CapgoCapacitorUpdater", package: "CapgoCapacitorUpdater"),
-                .product(name: "CapgoNativeNavigation", package: "CapgoNativeNavigation"),
                 .product(name: "CapgoOauthLoopback", package: "CapgoOauthLoopback"),
                 .product(name: "CapacitorSecureStoragePlugin", package: "CapacitorSecureStoragePlugin")
             ]
