@@ -26,9 +26,6 @@ project(':capgo-capacitor-speech-recognition').projectDir = new File('../node_mo
 include ':capgo-capacitor-updater'
 project(':capgo-capacitor-updater').projectDir = new File('../node_modules/@capgo/capacitor-updater/android')
 
-include ':capgo-native-navigation'
-project(':capgo-native-navigation').projectDir = new File('../node_modules/@capgo/native-navigation/android')
-
 include ':capgo-oauth-loopback'
 project(':capgo-oauth-loopback').projectDir = new File('../node_modules/@capgo/oauth-loopback/android')
 

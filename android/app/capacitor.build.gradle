@@ -17,7 +17,6 @@ dependencies {
     implementation project(':capgo-capacitor-inappbrowser')
     implementation project(':capgo-capacitor-speech-recognition')
     implementation project(':capgo-capacitor-updater')
-    implementation project(':capgo-native-navigation')
     implementation project(':capgo-oauth-loopback')
     implementation project(':capacitor-secure-storage-plugin')
 
