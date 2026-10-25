@@ -36,7 +36,7 @@ const storeButtons = `
 function layout(page: Page): string {
   const analytics = page.path === '/run/' || page.path === '/open/'
     ? ''
-    : '<script defer fetchpriority="low" data-website-id="dfid_hZyLxJ3zsMqivo2WX1caj" data-domain="autobrowse.dev" src="https://datafa.st/js/script.cookieless.js"></script>';
+    : '<script defer fetchpriority="low" data-website-id="dfid_hZyLxJ3zsMqivo2WX1caj" data-domain="autobrowse.dev" src="https://datafa.st/js/script.js"></script>';
   const nav = page.bare
     ? ''
     : `<header class="nav"><a class="brand" href="/"><img src="/icon.png" alt="" width="32" height="32">Auto Browse</a>
@@ -175,7 +175,7 @@ const privacy: Page = {
 <p>Websites you open in the app may collect data under their own privacy policies, like in any browser.</p>
 
 <h2>Website analytics</h2>
-<p>We use <a href="https://datafast.io">DataFast</a> in cookieless mode to measure visits to autobrowse.dev. Website analytics can include the page URL, referring website, browser and device information, and approximate location derived from your IP address. This helps us understand how people find and use the website. The task-opening pages at <code>/run/</code> and <code>/open/</code> do not load analytics, so their task prompts and destination URLs are not sent to DataFast. This website analytics script is not included in the mobile app. See <a href="https://datafast.io/privacy-policy">DataFast's privacy policy</a>.</p>
+<p>We use <a href="https://datafast.io">DataFast</a> to measure visits to autobrowse.dev. DataFast uses cookies to recognize returning visitors and understand which traffic sources lead to visits. Website analytics can include the page URL, referring website, browser and device information, and approximate location derived from your IP address. This helps us understand how people find and use the website. The task-opening pages at <code>/run/</code> and <code>/open/</code> do not load analytics, so their task prompts and destination URLs are not sent to DataFast. This website analytics script is not included in the mobile app. See <a href="https://datafast.io/privacy-policy">DataFast's privacy policy</a>.</p>
 
 <h2>Children</h2>
 <p>The app is not directed to children under 13 and needs a ChatGPT account, which has its own age requirements.</p>
