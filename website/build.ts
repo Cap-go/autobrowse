@@ -15,7 +15,7 @@ const GITHUB = 'https://github.com/Cap-go/autobrowse';
 const APP_STORE = 'https://apps.apple.com/app/id6821215230';
 const PLAY = 'https://play.google.com/store/apps/details?id=app.capgo.browser';
 const EMAIL = 'tori@capgo.app';
-const UPDATED = 'October 13, 2026';
+const UPDATED = 'October 25, 2026';
 
 interface Page {
   path: string;
@@ -34,6 +34,9 @@ const storeButtons = `
 </div>`;
 
 function layout(page: Page): string {
+  const analytics = page.path === '/run/' || page.path === '/open/'
+    ? ''
+    : '<script defer fetchpriority="low" data-website-id="dfid_hZyLxJ3zsMqivo2WX1caj" data-domain="autobrowse.dev" src="https://datafa.st/js/script.cookieless.js"></script>';
   const nav = page.bare
     ? ''
     : `<header class="nav"><a class="brand" href="/"><img src="/icon.png" alt="" width="32" height="32">Auto Browse</a>
@@ -56,6 +59,7 @@ function layout(page: Page): string {
 <link rel="icon" href="/icon.png">
 <link rel="apple-touch-icon" href="/icon.png">
 <link rel="stylesheet" href="/style.css">
+${analytics}
 </head>
 <body>
 ${nav}
@@ -128,11 +132,11 @@ const privacy: Page = {
   body: `<article class="doc">
 <h1>Privacy Policy</h1>
 <p class="muted">Last updated: ${UPDATED}</p>
-<p>Auto Browse ("the app") is made by Digital shift OU, operating Capgo ("we"). This policy explains what happens to your data when you use the app on iOS or Android.</p>
+<p>Auto Browse ("the app") is made by Digital shift OU, operating Capgo ("we"). This policy explains what happens to your data when you use the app on iOS or Android, or visit autobrowse.dev.</p>
 
 <h2>Summary</h2>
 <ul>
-<li>No Auto Browse account, no ads, no analytics, no tracking.</li>
+<li>The app has no Auto Browse account, no ads, no analytics, and no tracking.</li>
 <li>Data is sent to OpenAI only after you allow it in the app, and only to do the tasks you ask for.</li>
 <li>Passwords and secrets you type in secure cards are never sent to OpenAI or to us.</li>
 <li>Your ChatGPT sign in is stored only in the iOS Keychain or Android Keystore.</li>
@@ -169,6 +173,9 @@ const privacy: Page = {
 
 <h2>Websites you visit</h2>
 <p>Websites you open in the app may collect data under their own privacy policies, like in any browser.</p>
+
+<h2>Website analytics</h2>
+<p>We use <a href="https://datafast.io">DataFast</a> in cookieless mode to measure visits to autobrowse.dev. Website analytics can include the page URL, referring website, browser and device information, and approximate location derived from your IP address. This helps us understand how people find and use the website. The task-opening pages at <code>/run/</code> and <code>/open/</code> do not load analytics, so their task prompts and destination URLs are not sent to DataFast. This website analytics script is not included in the mobile app. See <a href="https://datafast.io/privacy-policy">DataFast's privacy policy</a>.</p>
 
 <h2>Children</h2>
 <p>The app is not directed to children under 13 and needs a ChatGPT account, which has its own age requirements.</p>
