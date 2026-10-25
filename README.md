@@ -9,7 +9,7 @@ Mobile AI browser for iOS and Android (Capacitor 8). Sign in with ChatGPT, chat 
 - **Chat UI** (text first; voice planned with on-device STT/TTS).
 - **Agent loop** against the OpenAI Responses API (`store: false`, `stream: true`) using only the ChatGPT plan token.
 - **Browser tools** mapped to `@capgo/capacitor-inappbrowser` (navigate, screenshot, click, type, scroll, read DOM, extract).
-- **Native chrome** via `@capgo/native-navigation` (navbar, tab bar, safe areas).
+- **Native Duo sidebar** via `@capgo/capacitor-native-navigation`: Back, Browse, Tabs and Settings in the side rail. Other devices keep the web browser controls.
 
 ## Docs
 

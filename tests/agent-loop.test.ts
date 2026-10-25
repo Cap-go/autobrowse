@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
+import { Capacitor } from '@capacitor/core';
 import type { OAuthCredentialRecord } from '../src/auth/types';
 import type { AgentConversationItem } from '../src/agent/types';
 import { formatApiError, isUsageLimitError } from '../src/agent/errors';
@@ -18,7 +19,7 @@ const browserPlugin = {
     setTimeout(() => listeners.get('browserPageLoaded')?.({ id: 'webview_1', url: '' }), 0);
   }),
   updateDimensions: mock(async () => {}),
-  goBack: mock(async () => {}),
+  goBack: mock(async () => ({ canGoBack: false })),
   takeScreenshot: mock(async () => ({ base64: 'c2NyZWVuc2hvdA==' })),
   dispatchInputEvent: mock(async () => {}),
   executeScript: mock(async (_opts?: { code: string }) => {}),
@@ -30,7 +31,7 @@ mock.module('@capgo/capacitor-inappbrowser', () => ({
 
 const { parseResponsesJson, createResponseStream } = await import('../src/agent/responses-api');
 const { appendUserMessage, createInitialState, runAgentTurn } = await import('../src/agent/loop');
-const { defaultTab: browser } = await import('../src/browser/browser-controller');
+const { defaultTab: browser, BrowserTab } = await import('../src/browser/browser-controller');
 const oauth = await import('../src/auth/oauth');
 
 const creds: OAuthCredentialRecord = {
@@ -297,6 +298,21 @@ describe('agent loop', () => {
 });
 
 describe('browser lifecycle', () => {
+  test('older native builds without BrowserLayout keep the original viewport coordinates', async () => {
+    const native = spyOn(Capacitor, 'isNativePlatform').mockReturnValue(true);
+    const available = spyOn(Capacitor, 'isPluginAvailable').mockReturnValue(false);
+    const tab = new BrowserTab();
+    try {
+      await tab.setFrame({ x: 12, y: 54, width: 320, height: 300 });
+      await tab.open('https://example.com');
+      expect(browserPlugin.openWebView).toHaveBeenLastCalledWith(expect.objectContaining({ x: 12, y: 54, width: 320, height: 300 }));
+    } finally {
+      await tab.close();
+      native.mockRestore();
+      available.mockRestore();
+    }
+  });
+
   test('navigate opens the browser, reuses it, and close clears it', async () => {
     expect(browser.isOpen).toBe(false);
     await browser.navigate('https://example.com');
@@ -323,6 +339,17 @@ describe('browser lifecycle', () => {
     expect(browser.isOpen).toBe(true);
     listeners.get('closeEvent')?.({ id: 'webview_1', url: '' });
     expect(browser.isOpen).toBe(false);
+  });
+
+  test('Back reports whether native history navigation succeeded', async () => {
+    await browser.open('https://example.com');
+    browserPlugin.goBack.mockResolvedValueOnce({ canGoBack: true });
+    expect(await browser.goBack()).toBe(true);
+    browserPlugin.goBack.mockResolvedValueOnce({ canGoBack: false });
+    expect(await browser.goBack()).toBe(false);
+    await browser.close();
+    expect(browser.url).toBeNull();
+    expect(browser.title).toBe('');
   });
 
   test('all page tools give a clear error while the browser is closed', async () => {

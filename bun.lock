@@ -14,6 +14,7 @@
         "@capacitor/keyboard": "^8.0.6",
         "@capacitor/share": "^8.0.3",
         "@capgo/capacitor-inappbrowser": "^8.26.2",
+        "@capgo/capacitor-native-navigation": "^8.14.0",
         "@capgo/capacitor-speech-recognition": "^8.4.5",
         "@capgo/capacitor-updater": "^8.53.1",
         "@capgo/oauth-loopback": "file:./plugins/oauth-loopback",
@@ -53,6 +54,8 @@
     "@capacitor/synapse": ["@capacitor/synapse@1.0.4", "", {}, "sha512-/C1FUo8/OkKuAT4nCIu/34ny9siNHr9qtFezu4kxm6GY1wNFxrCFWjfYx5C1tUhVGz3fxBABegupkpjXvjCHrw=="],
 
     "@capgo/capacitor-inappbrowser": ["@capgo/capacitor-inappbrowser@8.26.2", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-l7Q5pWM+ABIs+nIBpi5pXsbGjFavnsqZ+fkfdAm+jpAets4gXRQmDQSE6O4pxAre22GoISJplUtnaIxU7lZwHQ=="],
+
+    "@capgo/capacitor-native-navigation": ["@capgo/capacitor-native-navigation@8.14.0", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-U/U4LsvnHJwa4kMFnQP/5LuvZ6xCUbFwE1KZqQz30bf/rSqJFUG0Gth3Kajh4an/W66oy3knxVTSkIqxpLcwxA=="],
 
     "@capgo/capacitor-speech-recognition": ["@capgo/capacitor-speech-recognition@8.4.5", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-SqET+nhMdN4EYuHKvki3PzTdvEEiGE8X1PgqoFyKkh9eIHA8t7z98H00fkL7nVnwQnbMIqWajB9NHhvDg24E2Q=="],
 

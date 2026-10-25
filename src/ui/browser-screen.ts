@@ -3,6 +3,7 @@ import { appendUserMessage, createInitialState, runAgentTurn, StoppedError, type
 import { AppLauncher } from '@capacitor/app-launcher';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
+import { NativeNavigation } from '@capgo/capacitor-native-navigation';
 import { BrowserTab, onExternalLink, onPillTap } from '../browser/browser-controller';
 import { isAppActive, onAppActiveChange } from '../agent/lifecycle';
 import type { DeepLinkAction } from '../deeplink';
@@ -25,6 +26,7 @@ import { copyText, fileCard } from './export';
 import { sendReport } from './report';
 import { VoiceInput } from './voice';
 import { hasAiConsent } from './ai-consent';
+import { DuoNavigation } from './duo-navigation';
 
 export interface BrowserScreenHost {
   creds(): OAuthCredentialRecord | null;
@@ -126,6 +128,7 @@ export class BrowserScreen {
   private sheetsOpen = 0;
   private offscreen = false;
   private cleanups: Array<() => void> = [];
+  private readonly nativeNavigation: DuoNavigation | null;
   /** Task typed before signing in; sent once the user is signed in. */
   private pendingPrompt: { tab: Tab; text: string; url?: string } | null = null;
 
@@ -146,6 +149,19 @@ export class BrowserScreen {
 
   constructor(private host: BrowserScreenHost) {
     this.active = this.createTab();
+    this.nativeNavigation = Capacitor.getPlatform() === 'ios' && Capacitor.isPluginAvailable('NativeNavigation')
+      ? new DuoNavigation(NativeNavigation, {
+          back: async () => {
+            const browser = this.active.browser;
+            if (!await browser.goBack()) await browser.close();
+          },
+          tabs: () => this.openTabSwitcher(),
+          settings: () => this.host.openSettings(),
+          active: (active) => this.section?.classList.toggle('native-side-navigation', active),
+          layout: () => this.syncFrame(),
+          error: () => toast('Native navigation unavailable. Use the browser controls.'),
+        })
+      : null;
     onExternalLink((tab, url) => this.confirmExternal(tab, url));
     onPillTap((browser) => {
       if (browser === this.active.browser) this.setMode(this.active, 'split');
@@ -186,7 +202,7 @@ export class BrowserScreen {
     this.section = section;
 
     // Address bar
-    this.backBtn = h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Back' }, icon('back'));
+    this.backBtn = h('button', { class: 'icon-btn browser-back', type: 'button', 'aria-label': 'Back' }, icon('back'));
     this.backBtn.addEventListener('click', () => void this.active.browser.goBack().catch(() => undefined));
     this.address = h('input', {
       type: 'text',
@@ -293,7 +309,10 @@ export class BrowserScreen {
       this.cleanups.push(finishEditing);
     }
 
-    const observer = new ResizeObserver(() => this.syncFrame());
+    const observer = new ResizeObserver(() => {
+      this.syncFrame();
+      this.syncNativeNavigation();
+    });
     observer.observe(this.pageArea);
     this.cleanups.push(() => observer.disconnect());
     const onResize = (): void => this.syncFrame();
@@ -306,6 +325,7 @@ export class BrowserScreen {
 
   dispose(): void {
     this.cleanups.splice(0).forEach((fn) => fn());
+    this.nativeNavigation?.update({ visible: false, canGoBack: false, tabCount: this.tabs.length });
   }
 
   async handleBack(): Promise<boolean> {
@@ -323,6 +343,7 @@ export class BrowserScreen {
   /** Hide every native page (sheets, other screens). Counted so nested sheets work. */
   async hidePages(): Promise<void> {
     this.sheetsOpen += 1;
+    this.syncNativeNavigation();
     await Promise.all(this.tabs.map((tab) => tab.browser.setVisible(false)));
   }
 
@@ -584,6 +605,7 @@ export class BrowserScreen {
   }
 
   private syncVisibility(): void {
+    this.syncNativeNavigation();
     queueMicrotask(() => this.syncPill());
     const showActive = !this.offscreen && !this.overlayOpen && this.sheetsOpen === 0 && this.active.mode !== 'chat' && !!this.section?.isConnected;
     for (const tab of this.tabs) {
@@ -677,6 +699,15 @@ export class BrowserScreen {
     this.syncPill();
     this.reloadBtn.hidden = !b.isOpen;
     this.syncStatus();
+    this.syncNativeNavigation();
+  }
+
+  private syncNativeNavigation(): void {
+    this.nativeNavigation?.update({
+      visible: !!this.section?.isConnected && !this.offscreen && !this.overlayOpen && this.sheetsOpen === 0,
+      canGoBack: this.active.browser.isOpen,
+      tabCount: this.tabs.length,
+    });
   }
 
   private syncStatus(): void {

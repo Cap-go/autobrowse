@@ -6,7 +6,7 @@ Auto Browse is meant to behave like a normal mobile browser for credentials: use
 
 We use `@capgo/capacitor-inappbrowser` **`openWebView()`** (native `WKWebView` on iOS, `WebView` on Android), not a headless or off-screen view. The agent drives the page through `dispatchInputEvent`, `executeScript`, and screenshots, but the web content stays in a real webview users can focus for manual login.
 
-Native chrome (navbar, tab bar, safe areas) comes from `@capgo/native-navigation`.
+The iPhone Duo sidebar uses `@capgo/capacitor-native-navigation`. Website fields remain in the InAppBrowser WebView, separate from the native navigation controls.
 
 ## iOS configuration (scaffold)
 

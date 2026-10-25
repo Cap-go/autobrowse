@@ -94,6 +94,8 @@ Upload in this order (already sized, no alpha):
 
 App icon 1024×1024 (no alpha): `store/icon/AppIcon-1024.png` (also inside the Xcode asset catalog).
 
+Additional iPhone Duo previews and native verification captures are documented in `store/screenshots/iphone-duo/README.md`. They are local supplementary assets, not replacements for the upload sizes above, and have not been uploaded to App Store Connect.
+
 ## Age rating questionnaire
 
 | Question | Answer |

@@ -40,9 +40,9 @@ let listenersReady: Promise<void> | undefined;
 const BrowserLayout = registerPlugin<{ getOrigin(): Promise<{ x: number; y: number }> }>('BrowserLayout');
 
 async function nativeFrame(f: BrowserFrame): Promise<BrowserFrame> {
-  // Android dialogs use screen coordinates; older WebViews are inset by the
-  // host activity. Both plugins accept dp, so never multiply by devicePixelRatio.
-  const origin = Capacitor.getPlatform() === 'android' ? await BrowserLayout.getOrigin() : { x: 0, y: 0 };
+  const origin = Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('BrowserLayout')
+    ? await BrowserLayout.getOrigin()
+    : { x: 0, y: 0 };
   return { x: Math.round(f.x + origin.x), y: Math.round(f.y + origin.y), width: Math.round(f.width), height: Math.round(f.height) };
 }
 
@@ -228,6 +228,8 @@ export class BrowserTab {
 
   handleClosed(): void {
     this.canGoBack = false;
+    this.url = null;
+    this.title = '';
     if (this.webViewId) tabsByWebView.delete(this.webViewId);
     this.webViewId = undefined;
     this.loading = false;
@@ -396,8 +398,9 @@ export class BrowserTab {
     await this.close();
   }
 
-  async goBack(): Promise<void> {
-    await InAppBrowser.goBack({ id: this.requireId() });
+  async goBack(): Promise<boolean> {
+    const { canGoBack } = await InAppBrowser.goBack({ id: this.requireId() });
+    return canGoBack;
   }
 
   async reload(): Promise<void> {
