@@ -13,6 +13,7 @@ const REPO = join(ROOT, '..');
 const SITE = 'https://autobrowse.dev';
 const GITHUB = 'https://github.com/Cap-go/autobrowse';
 const APP_STORE = 'https://apps.apple.com/app/id6821215230';
+const TESTFLIGHT = 'https://testflight.apple.com/join/psuRePF8';
 const PLAY = 'https://play.google.com/store/apps/details?id=app.capgo.browser';
 const EMAIL = 'tori@capgo.app';
 const UPDATED = 'October 25, 2026';
@@ -31,6 +32,7 @@ const storeButtons = `
 <div class="stores">
   <a class="store" href="${APP_STORE}"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.1zM13.9 5c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.1.1 2.3-.6 3-1.5z"/></svg><span><small>Download on the</small>App Store</span></a>
   <a class="store" href="${PLAY}"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 2.6v18.8c0 .4.4.7.8.5l10.4-10.4L4.8 2.1c-.4-.2-.8.1-.8.5zm12.6 7.5L6.9 4.5l9.7 9.7v-4.1zm0 3.8L6.9 23.5l9.7-5.6 3.3-1.9c.9-.5.9-1.6 0-2.1l-3.3-1.9z"/></svg><span><small>Get it on</small>Google Play</span></a>
+  <a class="store" href="${TESTFLIGHT}"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg><span><small>Join the iOS beta on</small>TestFlight</span></a>
 </div>`;
 
 function layout(page: Page): string {
